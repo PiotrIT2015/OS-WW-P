@@ -10,3 +10,6 @@ A simple OS simulation with desktop.
 ## Technologies
 Project is created with:
 * python version: 3.10
+...,but project also use:
+* Apache
+* MySQL
