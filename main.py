@@ -113,27 +113,21 @@ class Scheduler:
 class ImageViewerApp:
     def __init__(self, root):
         self.root = root
-        self.root.title("WW-P")
+        self.root.title("WhiteWar")
         self.root.geometry("1200x600")
 
-        # Store loaded images
-        self.categories = {}
-        self.current_category = None
-        self.current_image_index = 0
-        self.image_labels = []
-
-        # Default directory for categories
-        self.base_directory = os.path.join(os.getcwd(), "img")  # Compatible with Windows and other OS
+        # Current directory
+        self.current_directory = os.path.join(os.getcwd(), "img")  # Default to img directory
 
         # Default image path
-        self.default_image_path = os.path.join(os.getcwd(), "img\\ikigai.jpeg")  # Path to the default image
+        self.default_image_path = os.path.join(os.getcwd(), "img\\ikigai.jpeg")
 
         # Create a default image if it doesn't exist
         self.create_default_image()
 
         # GUI Layout
         self.setup_gui()
-        self.load_categories()  # Automatically load categories on startup
+        self.populate_tree(self.current_directory, "") #populate tree on startup
 
     def create_default_image(self):
         if not os.path.exists(self.default_image_path):
@@ -141,10 +135,10 @@ class ImageViewerApp:
             img.save(self.default_image_path)
 
     def setup_gui(self):
-        # Category list
-        self.category_listbox = Listbox(self.root, selectmode=EXTENDED, height=20, width=30)
-        self.category_listbox.pack(side="left", fill="y")
-        self.category_listbox.bind("<<ListboxSelect>>", self.on_category_select)
+        # File and folder tree
+        self.tree = ttk.Treeview(self.root, show="tree", height=20, selectmode=tk.BROWSE)
+        self.tree.pack(side="left", fill="y", padx=5, pady=5)
+        self.tree.bind("<<TreeviewSelect>>", self.on_tree_select)
 
         # Image display area
         self.image_frame = Frame(self.root)
@@ -153,71 +147,103 @@ class ImageViewerApp:
         self.canvas = Canvas(self.image_frame, bg="white")
         self.canvas.pack(fill="both", expand=True)
 
+         # Text display area
+        self.text_area = scrolledtext.ScrolledText(self.image_frame, wrap=tk.WORD, width=80, height=25)
+        self.text_area.pack(fill="both", expand=True)
+        self.text_area.pack_forget() # hide text area at start
+
         # Buttons
         self.button_frame = Frame(self.root)
         self.button_frame.pack(side="bottom", fill="x")
 
         Button(self.button_frame, text="Previous Image", command=self.prev_image).pack(side="top")
         Button(self.button_frame, text="Next Image", command=self.next_image).pack(side="top")
-        Button(self.button_frame, text="Refresh Categories", command=self.load_categories).pack(side="top")
-        Button(self.button_frame, text="RelaxationTube", command=self.launch_yii_app).pack(side="top")
-        Button(self.button_frame, text="Exit", command=self.root.quit).pack(side="top")
+        Button(self.button_frame, text="New File", command=self.create_new_file).pack(side="top")
+
 
         self.show_default_image()
 
-    def launch_yii_app(self):
+    def populate_tree(self, parent_dir, parent_id):
         try:
-            subprocess.Popen(["php", "yii", "serve"], cwd=os.path.join(os.getcwd(), "RelaxationTube"))
-            print("Yii application launched.")
-        except Exception as e:
-            print(f"Failed to launch Yii application: {e}")
+            for item in os.listdir(parent_dir):
+                item_path = os.path.join(parent_dir, item)
+                item_id = self.tree.insert(parent_id, 'end', text=item, open=False)
 
-    def load_categories(self):
-        directory = self.base_directory
-        if not os.path.exists(directory):
-            print(f"Directory {directory} does not exist.")
-            return
+                if os.path.isdir(item_path):
+                    self.populate_tree(item_path, item_id)
+        except FileNotFoundError:
+            messagebox.showerror("Error", f"Directory not found: {parent_dir}")
 
-        self.categories.clear()
-        self.category_listbox.delete(0, "end")
 
-        for category in os.listdir(directory):
-            category_path = os.path.join(directory, category)
-            if os.path.isdir(category_path):
-                images = [os.path.join(category_path, f) for f in os.listdir(category_path) if
-                          f.lower().endswith((".png", ".jpg", ".jpeg", ".gif"))]
-                if images:
-                    self.categories[category] = images
-                    self.category_listbox.insert("end", category)
+    def on_tree_select(self, event):
+        selected_items = self.tree.selection()
+        if selected_items:
+            item_id = selected_items[0]
+            item_path = self.get_path_from_tree_item(item_id)
 
-        if not self.categories:
-            self.show_default_image()  # Show default if no categories
+            if os.path.isfile(item_path):
+                self.show_file_content(item_path) # Show content for files
+            else:
+                self.show_default_image()
 
-    def on_category_select(self, event):
-        selected = self.category_listbox.curselection()
-        if selected:
-            self.current_category = self.category_listbox.get(selected[0])
-            self.current_image_index = 0
-            self.show_image()
+    def get_path_from_tree_item(self, item_id):
+        path = self.tree.item(item_id, 'text')
+        parent_id = self.tree.parent(item_id)
 
-    def show_image(self):
-        if not self.current_category:
+        while parent_id:
+            path = os.path.join(self.tree.item(parent_id, 'text'), path)
+            parent_id = self.tree.parent(parent_id)
+
+        return os.path.join(self.current_directory,path)
+
+    def is_image_file(self, path):
+        image_extensions = (".png", ".jpg", ".jpeg", ".gif")
+        return path.lower().endswith(image_extensions)
+
+    def is_text_file(self,path):
+      text_extensions = (".txt", ".log", ".py")
+      return path.lower().endswith(text_extensions)
+
+    def show_file_content(self, file_path):
+        self.text_area.pack_forget()
+        self.canvas.pack_forget()
+
+        if self.is_image_file(file_path):
+            self.show_image(file_path)
+            self.canvas.pack(fill="both", expand=True)
+        elif self.is_text_file(file_path):
+            self.show_text_content(file_path)
+            self.text_area.pack(fill="both", expand=True)
+        else:
+            self.open_selected_file(file_path) #open with default application
             self.show_default_image()
-            return
 
-        images = self.categories.get(self.current_category, [])
-        if not images:
+    def show_image(self, image_path):
+         try:
+            if image_path:
+                self.text_area.pack_forget()
+                self.canvas.pack(fill="both", expand=True)
+                img = Image.open(image_path)
+                img.thumbnail((800, 600))
+                photo = ImageTk.PhotoImage(img)
+                self.canvas.delete("all")
+                self.canvas.create_image(400, 300, image=photo, anchor="center")
+                self.canvas.image = photo
+         except Exception as e:
+            print(f"Error loading image {image_path}: {e}")
             self.show_default_image()
-            return
 
-        image_path = images[self.current_image_index]
-        img = Image.open(image_path)
-        img.thumbnail((800, 600))
-        photo = ImageTk.PhotoImage(img)
-
-        self.canvas.delete("all")
-        self.canvas.create_image(400, 300, image=photo, anchor="center")
-        self.canvas.image = photo
+    def show_text_content(self, file_path):
+       try:
+           self.canvas.pack_forget()
+           self.text_area.pack(fill="both", expand=True)
+           with open(file_path, 'r', encoding='utf-8') as file:
+               content = file.read()
+               self.text_area.delete('1.0', tk.END)
+               self.text_area.insert('1.0', content)
+       except Exception as e:
+            self.text_area.delete('1.0', tk.END)
+            self.text_area.insert('1.0', f"Error reading file: {e}")
 
     def show_default_image(self):
         img = Image.open(self.default_image_path)
@@ -225,25 +251,30 @@ class ImageViewerApp:
         self.canvas.delete("all")
         self.canvas.create_image(400, 300, image=photo, anchor="center")
         self.canvas.image = photo
+        self.text_area.pack_forget()
 
     def prev_image(self):
-        if not self.current_category:
-            return
-
-        self.current_image_index -= 1
-        if self.current_image_index < 0:
-            self.current_image_index = len(self.categories[self.current_category]) - 1
-        self.show_image()
+        # Not needed in current approach
+        pass
 
     def next_image(self):
-        if not self.current_category:
-            return
+        # Not needed in current approach
+        pass
 
-        self.current_image_index += 1
-        if self.current_image_index >= len(self.categories[self.current_category]):
-            self.current_image_index = 0
-        self.show_image()
+    def create_new_file(self):
+        # Not needed in current approach
+        pass
 
+    def open_selected_file(self, file_path):
+        try:
+            if file_path:
+                subprocess.Popen(['start', file_path], shell=True)  # Windows
+            else:
+                messagebox.showerror("Error", f"No file selected")
+        except FileNotFoundError:
+                messagebox.showerror("Error", f"File not found: {file_path}")
+        except Exception as e:
+            messagebox.showerror("Error", f"Could not open the file: {e}")
 
 class OS:
     def __init__(self, root):
@@ -324,8 +355,8 @@ class OS:
             # "action": self.open_file_manager},
             {"name": "Settings", "icon": os.path.join(os.getcwd(), "img\\sys\\settings_icon.png"),
              "action": self.open_settings},
-            {"name": "Yii App", "icon": os.path.join(os.getcwd(), "img\\sys\\musical-note.png"), "action": self.open_yii_app},
-            {"name": "Image Viewer", "icon": os.path.join(os.getcwd(), "img\\sys\\file_icon.png"),
+            {"name": "WitchCraft", "icon": os.path.join(os.getcwd(), "img\\sys\\musical-note.png"), "action": self.open_yii_app},
+            {"name": "White War", "icon": os.path.join(os.getcwd(), "img\\sys\\file_icon.png"),
              "action": self.open_image_viewer},
         ]
 
@@ -588,7 +619,7 @@ def example_process(name, delay):
 
 if __name__ == "__main__":
     root = tk.Tk()
-    root.title("Mini OS")
+    root.title("WW Space")
     root.geometry("800x600")
     my_os = OS(root)
 
