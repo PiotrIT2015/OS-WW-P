@@ -1,6 +1,6 @@
 import tkinter as tk
 from tkinter import ttk
-from tkinter import scrolledtext, messagebox, filedialog
+from tkinter import scrolledtext, messagebox, filedialog, colorchooser
 import time
 import threading
 import os
@@ -8,6 +8,7 @@ import uuid
 from collections import deque
 from PIL import Image, ImageTk
 from datetime import datetime
+import socket
 
 
 class Process:
@@ -115,6 +116,7 @@ class OS:
         self.scheduler = Scheduler()
         self.app_windows = {}
         self.taskbar_buttons = {}
+        self.desktop_bg_color = "lightgray"
         self.create_desktop()
         self.create_taskbar()
         self.create_icons()
@@ -157,7 +159,7 @@ class OS:
         self.scheduler.stop()
 
     def create_desktop(self):
-        self.desktop = tk.Frame(self.root, bg="lightgray")
+        self.desktop = tk.Frame(self.root, bg=self.desktop_bg_color)
         self.desktop.pack(fill=tk.BOTH, expand=True)
 
     def create_taskbar(self):
@@ -166,7 +168,7 @@ class OS:
 
         # Start menu button
         self.start_menu_button = tk.Menubutton(self.taskbar, text="Start", relief=tk.RAISED,
-                                              borderwidth=2, bg="lightgray")
+                                               borderwidth=2, bg="lightgray")
         self.start_menu_button.pack(side=tk.LEFT, padx=5, pady=2)
         self.start_menu = tk.Menu(self.start_menu_button, tearoff=0)
         self.start_menu_button["menu"] = self.start_menu
@@ -179,7 +181,6 @@ class OS:
         self.time_label = tk.Label(self.taskbar, text="", bg="gray", fg="white")
         self.time_label.pack(side=tk.RIGHT, padx=5, pady=2)
 
-
     def create_icons(self):
         icons_data = [
             {"name": "File Manager", "icon": "file_icon.png", "action": self.open_file_manager},
@@ -191,7 +192,7 @@ class OS:
                 image = Image.open(icon_data["icon"]).resize((64, 64))
                 photo = ImageTk.PhotoImage(image)
                 label = tk.Label(self.desktop, image=photo, text=icon_data["name"], compound=tk.TOP,
-                                 bg="lightgray", cursor="hand2")
+                                 bg=self.desktop_bg_color, cursor="hand2")
                 label.image = photo  # Zachowaj referencję
                 label.grid(row=i // 2, column=i % 2, padx=20, pady=20)
                 label.bind("<Button-1>", lambda event, action=icon_data["action"]: action())
@@ -201,7 +202,6 @@ class OS:
 
             except FileNotFoundError:
                 print(f"Brak pliku: {icon_data['icon']}")
-
 
     def update_time(self):
         current_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
@@ -310,11 +310,75 @@ class OS:
             self.app_windows["settings"].lift()
 
     def create_settings_widgets(self, parent):
-        label = tk.Label(parent, text="Settings are not implemented yet.")
-        label.pack(padx=10, pady=10)
+        notebook = ttk.Notebook(parent)
+        notebook.pack(padx=10, pady=10, fill=tk.BOTH, expand=True)
+
+        self.create_network_settings(notebook)
+        self.create_personalization_settings(notebook)
+
+    def create_network_settings(self, notebook):
+        network_frame = ttk.Frame(notebook)
+        notebook.add(network_frame, text="Network")
+
+        ip_label = ttk.Label(network_frame, text="IP Address:")
+        ip_label.grid(row=0, column=0, padx=5, pady=5, sticky=tk.W)
+        self.ip_display = ttk.Label(network_frame, text="Not Available")
+        self.ip_display.grid(row=0, column=1, padx=5, pady=5, sticky=tk.W)
+        self.update_ip_address()
+
+        hostname_label = ttk.Label(network_frame, text="Hostname:")
+        hostname_label.grid(row=1, column=0, padx=5, pady=5, sticky=tk.W)
+        self.hostname_display = ttk.Label(network_frame, text="Not Available")
+        self.hostname_display.grid(row=1, column=1, padx=5, pady=5, sticky=tk.W)
+        self.update_hostname()
+
+        refresh_button = ttk.Button(network_frame, text="Refresh",
+                                    command=lambda: [self.update_ip_address(), self.update_hostname()])
+        refresh_button.grid(row=2, column=0, columnspan=2, padx=5, pady=5)
+
+    def update_ip_address(self):
+        try:
+            hostname = socket.gethostname()
+            ip_address = socket.gethostbyname(hostname)
+            self.ip_display.config(text=ip_address)
+        except socket.gaierror:
+            self.ip_display.config(text="Not Available")
+        except Exception as e:
+            self.ip_display.config(text="Error")
+            print(f"Error in update_ip_address: {e}")
+
+    def update_hostname(self):
+        try:
+            hostname = socket.gethostname()
+            self.hostname_display.config(text=hostname)
+        except socket.gaierror:
+            self.hostname_display.config(text="Not Available")
+        except Exception as e:
+            self.hostname_display.config(text="Error")
+            print(f"Error in update_hostname: {e}")
+
+    def create_personalization_settings(self, notebook):
+        personalization_frame = ttk.Frame(notebook)
+        notebook.add(personalization_frame, text="Personalization")
+
+        bg_color_label = ttk.Label(personalization_frame, text="Desktop Background Color:")
+        bg_color_label.grid(row=0, column=0, padx=5, pady=5, sticky=tk.W)
+
+        bg_color_button = ttk.Button(personalization_frame, text="Choose Color", command=self.choose_background_color)
+        bg_color_button.grid(row=0, column=1, padx=5, pady=5, sticky=tk.W)
+
+    def choose_background_color(self):
+        color = colorchooser.askcolor(title="Choose Background Color")[1]
+        if color:
+            self.desktop_bg_color = color
+            self.desktop.config(bg=self.desktop_bg_color)
+            for label in self.desktop.winfo_children():
+                if isinstance(label, tk.Label):
+                    label.config(bg=self.desktop_bg_color)
 
     def add_taskbar_button(self, app_key, app_name, window):
-        button = ttk.Button(self.task_button_area, text=app_name, command=lambda: window.lift())
+        button = ttk.Button(self.task_button_area, text=app_name,
+                            command=lambda win=window: self.handle_taskbar_button_click(win))
         button.pack(side=tk.LEFT, padx=2, pady=2)
         self.taskbar_buttons[app_key] = button
 
@@ -322,7 +386,37 @@ class OS:
             button.destroy()
             del self.taskbar_buttons[app_key]
 
+            if app_key in self.app_windows:
+                self.app_windows[app_key].destroy()
+                del self.app_windows[app_key]
+
         window.protocol("WM_DELETE_WINDOW", on_close)
+        window.protocol("WM_STATE", lambda event, win=window: self.handle_window_state(win, event))
+
+        window.bind("<Destroy>", lambda event, win=window: self.handle_window_destroy(win))
+
+    def handle_window_destroy(self, window):
+        for key, app_window in self.app_windows.items():
+            if app_window == window:
+                del self.app_windows[key]
+                print(f"Window destroyed: {key}")
+                break
+
+    def handle_taskbar_button_click(self, window):
+        if window.winfo_state() == 'normal':
+            window.withdraw()
+        else:
+            window.deiconify()
+            window.lift()
+
+    def handle_window_state(self, window, event):
+        if event.type == "22":  # WM_STATE event
+            if window.winfo_state() == "withdrawn":
+                print("zminimalizowane")
+            elif window.winfo_state() == "normal":
+                print("normalne")
+            elif window.winfo_state() == "iconic":
+                print("zminimalizowane")
 
 
 def example_process(name, delay):
