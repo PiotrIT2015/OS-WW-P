@@ -7,6 +7,7 @@ import os
 import uuid
 from collections import deque
 from PIL import Image, ImageTk
+from datetime import datetime
 
 
 class Process:
@@ -113,8 +114,11 @@ class OS:
         self.filesystem = FileSystem()
         self.scheduler = Scheduler()
         self.app_windows = {}
+        self.taskbar_buttons = {}
         self.create_desktop()
+        self.create_taskbar()
         self.create_icons()
+        self.update_time()
 
     def create_process(self, target, args=(), name=None, is_daemon=False):
         process = Process(target, args, name, is_daemon)
@@ -156,12 +160,29 @@ class OS:
         self.desktop = tk.Frame(self.root, bg="lightgray")
         self.desktop.pack(fill=tk.BOTH, expand=True)
 
+    def create_taskbar(self):
+        self.taskbar = tk.Frame(self.root, bg="gray")
+        self.taskbar.pack(side=tk.BOTTOM, fill=tk.X)
+
+        # Start menu button
+        self.start_menu_button = tk.Menubutton(self.taskbar, text="Start", relief=tk.RAISED,
+                                              borderwidth=2, bg="lightgray")
+        self.start_menu_button.pack(side=tk.LEFT, padx=5, pady=2)
+        self.start_menu = tk.Menu(self.start_menu_button, tearoff=0)
+        self.start_menu_button["menu"] = self.start_menu
+
+        # Task buttons area
+        self.task_button_area = tk.Frame(self.taskbar, bg="gray")
+        self.task_button_area.pack(side=tk.LEFT, fill=tk.X, expand=True)
+
+        # Time Label
+        self.time_label = tk.Label(self.taskbar, text="", bg="gray", fg="white")
+        self.time_label.pack(side=tk.RIGHT, padx=5, pady=2)
+
+
     def create_icons(self):
-        # Przykład ikon - możesz dodać więcej
         icons_data = [
-
             {"name": "File Manager", "icon": "file_icon.png", "action": self.open_file_manager},
-
             {"name": "Settings", "icon": "settings_icon.png", "action": self.open_settings},
         ]
 
@@ -174,8 +195,18 @@ class OS:
                 label.image = photo  # Zachowaj referencję
                 label.grid(row=i // 2, column=i % 2, padx=20, pady=20)
                 label.bind("<Button-1>", lambda event, action=icon_data["action"]: action())
+
+                # Add to start menu
+                self.start_menu.add_command(label=icon_data["name"], command=icon_data["action"])
+
             except FileNotFoundError:
                 print(f"Brak pliku: {icon_data['icon']}")
+
+
+    def update_time(self):
+        current_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        self.time_label.config(text=current_time)
+        self.root.after(1000, self.update_time)
 
     def open_file_manager(self):
         if "file_manager" not in self.app_windows or not self.app_windows["file_manager"].winfo_exists():
@@ -183,6 +214,7 @@ class OS:
             file_manager_window.title("File Manager")
             self.app_windows["file_manager"] = file_manager_window
             self.create_file_manager_widgets(file_manager_window)
+            self.add_taskbar_button("file_manager", "File Manager", file_manager_window)
         else:
             self.app_windows["file_manager"].lift()
 
@@ -251,6 +283,7 @@ class OS:
             text_area.insert(tk.END, content)
             text_area.pack(padx=10, pady=10, fill=tk.BOTH, expand=True)
             self.app_windows[file_name] = file_window
+            self.add_taskbar_button(file_name, f"File: {file_name}", file_window)
         else:
             self.app_windows[file_name].lift()
 
@@ -272,12 +305,24 @@ class OS:
             settings_window.title("Settings")
             self.app_windows["settings"] = settings_window
             self.create_settings_widgets(settings_window)
+            self.add_taskbar_button("settings", "Settings", settings_window)
         else:
             self.app_windows["settings"].lift()
 
     def create_settings_widgets(self, parent):
         label = tk.Label(parent, text="Settings are not implemented yet.")
         label.pack(padx=10, pady=10)
+
+    def add_taskbar_button(self, app_key, app_name, window):
+        button = ttk.Button(self.task_button_area, text=app_name, command=lambda: window.lift())
+        button.pack(side=tk.LEFT, padx=2, pady=2)
+        self.taskbar_buttons[app_key] = button
+
+        def on_close():
+            button.destroy()
+            del self.taskbar_buttons[app_key]
+
+        window.protocol("WM_DELETE_WINDOW", on_close)
 
 
 def example_process(name, delay):
