@@ -9,7 +9,7 @@ from collections import deque
 from PIL import Image, ImageTk
 from datetime import datetime
 import socket
-
+import webbrowser
 
 class Process:
     def __init__(self, target, args=(), name=None, is_daemon=False):
@@ -183,8 +183,9 @@ class OS:
 
     def create_icons(self):
         icons_data = [
-            {"name": "File Manager", "icon": "file_icon.png", "action": self.open_file_manager},
-            {"name": "Settings", "icon": "settings_icon.png", "action": self.open_settings},
+            {"name": "File Manager", "icon": os.path.join(os.getcwd(), "img\\sys\\file_icon.png"), "action": self.open_file_manager},
+            {"name": "Settings", "icon": os.path.join(os.getcwd(), "img\\sys\\settings_icon.png"), "action": self.open_settings},
+            {"name": "Yii App", "icon": os.path.join(os.getcwd(), "img\\sys\\musical-note.png"), "action": self.open_yii_app},
         ]
 
         for i, icon_data in enumerate(icons_data):
@@ -202,6 +203,8 @@ class OS:
 
             except FileNotFoundError:
                 print(f"Brak pliku: {icon_data['icon']}")
+            except Exception as e:
+                print(f"Wystąpił błąd: {e}")
 
     def update_time(self):
         current_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
@@ -417,6 +420,13 @@ class OS:
                 print("normalne")
             elif window.winfo_state() == "iconic":
                 print("zminimalizowane")
+
+    def open_yii_app(self):
+        try:
+            # Podmień "192.168.1.100" na adres IP serwera, na którym jest Yii
+            webbrowser.open("yii-application.test")
+        except webbrowser.Error as e:
+            messagebox.showerror("Error", f"Nie można otworzyć przeglądarki: {e}")
 
 
 def example_process(name, delay):
