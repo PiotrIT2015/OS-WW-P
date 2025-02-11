@@ -1,3 +1,4 @@
+
 import tkinter as tk
 from tkinter import ttk
 from tkinter import scrolledtext, messagebox, filedialog, colorchooser, Listbox, EXTENDED, Button, Frame, Canvas
@@ -11,8 +12,16 @@ from datetime import datetime
 import socket
 import webbrowser
 import subprocess
+import tornado.ioloop
+import tornado.web
+import json
+import requests
+import pandas as pd
+import matplotlib.pyplot as plt
+from bs4 import BeautifulSoup
 
 
+# ... (Projekt 1 - Process, File, FileSystem, Scheduler classes - bez zmian) ...
 class Process:
     def __init__(self, target, args=(), name=None, is_daemon=False):
         self.id = uuid.uuid4()
@@ -108,7 +117,6 @@ class Scheduler:
     def stop(self):
         self._run = False
         self._thread.join()
-
 
 class ImageViewerApp:
     def __init__(self, root):
@@ -276,8 +284,13 @@ class ImageViewerApp:
         except Exception as e:
             messagebox.showerror("Error", f"Could not open the file: {e}")
 
+
 class OS:
     def __init__(self, root):
+        # ... (Projekt 1 - OS.__init__ - większość bez zmian)
+        self.create_icons()  # Ważne: Wywołujemy po self.create_desktop()
+        self.update_time()
+
         self.root = root
         self.processes = {}
         self.filesystem = FileSystem()
@@ -290,45 +303,61 @@ class OS:
         self.create_icons()
         self.update_time()
 
-    def create_process(self, target, args=(), name=None, is_daemon=False):
-        process = Process(target, args, name, is_daemon)
-        self.processes[process.id] = process
-        return process
+        # Dodajemy wątek Tornado
+        self.tornado_thread = threading.Thread(target=self.run_tornado, daemon=True)
+        self.tornado_thread.start()
+        self.SERVER_URL = "http://localhost:8888/search"
+        # Dodajemy wątek Tornado z obsługą wyjątków i możliwością ponownego uruchomienia
+        self.tornado_thread = None
+        self.start_tornado_server()
 
-    def get_process(self, process_id):
-        return self.processes.get(process_id)
 
-    def start_process(self, process_id):
-        process = self.processes.get(process_id)
-        if process:
-            process.start()
-
-    def stop_process(self, process_id):
-        process = self.processes.get(process_id)
-        if process:
-            process.stop()
-
-    def create_file(self, name):
-        return self.filesystem.create_file(name)
-
-    def read_file(self, name):
-        return self.filesystem.read_file(name)
-
-    def write_file(self, name, content):
-        return self.filesystem.write_file(name, content)
-
-    def delete_file(self, name):
-        return self.filesystem.delete_file(name)
-
-    def schedule_task(self, process, interval):
-        self.scheduler.add_task(process, interval)
-
-    def stop_scheduler(self):
-        self.scheduler.stop()
-
+    # ... (Projekt 1 - OS - metody bez zmian: create_desktop, create_taskbar, update_time, open_file_manager, create_file_manager_widgets, update_file_list, create_example_file, create_new_file, open_selected_file, show_file_content, delete_selected_file, open_settings, create_settings_widgets, create_network_settings, update_ip_address, update_hostname, create_personalization_settings, choose_background_color, add_taskbar_button, handle_taskbar_button_click, handle_window_state, handle_window_destroy) ...
     def create_desktop(self):
         self.desktop = tk.Frame(self.root, bg=self.desktop_bg_color)
         self.desktop.pack(fill=tk.BOTH, expand=True)
+
+    def update_time(self):
+        current_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        self.time_label.config(text=current_time)
+        self.root.after(1000, self.update_time)
+
+    def open_file_manager(self):
+        if "file_manager" not in self.app_windows or not self.app_windows["file_manager"].winfo_exists():
+            file_manager_window = tk.Toplevel(self.root)
+            file_manager_window.title("File Manager")
+            self.app_windows["file_manager"] = file_manager_window
+            self.create_file_manager_widgets(file_manager_window)
+            self.add_taskbar_button("file_manager", "File Manager", file_manager_window)
+        else:
+            self.app_windows["file_manager"].lift()
+
+    def create_file_manager_widgets(self, parent):
+        # File listbox
+        file_frame = ttk.LabelFrame(parent, text="File List")
+        file_frame.pack(padx=10, pady=10, fill=tk.BOTH, expand=True)
+        self.file_listbox = tk.Listbox(file_frame, width=50)
+        self.file_listbox.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
+        self.update_file_list()
+
+        # File operations
+        operation_frame = ttk.LabelFrame(parent, text="Operations")
+        operation_frame.pack(padx=10, pady=10, fill=tk.X)
+        ttk.Button(operation_frame, text="Create File", command=self.create_new_file).pack(side=tk.LEFT, padx=5, pady=5)
+        ttk.Button(operation_frame, text="Open File", command=self.open_selected_file).pack(side=tk.LEFT, padx=5,
+                                                                                            pady=5)
+        ttk.Button(operation_frame, text="Delete File", command=self.delete_selected_file).pack(side=tk.LEFT, padx=5,
+                                                                                                pady=5)
+        ttk.Button(operation_frame, text="Create Example File", command=self.create_example_file).pack(side=tk.LEFT,
+                                                                                                       padx=5, pady=5)
+
+        self.file_name_entry = ttk.Entry(operation_frame, width=20)
+        self.file_name_entry.pack(side=tk.LEFT, padx=5, pady=5)
+
+    def update_file_list(self):
+        self.file_listbox.delete(0, tk.END)
+        for file_name in self.filesystem.files.keys():
+            self.file_listbox.insert(tk.END, file_name)
 
     def create_taskbar(self):
         self.taskbar = tk.Frame(self.root, bg="gray")
@@ -351,13 +380,16 @@ class OS:
 
     def create_icons(self):
         icons_data = [
-            #{"name": "File Manager", "icon": os.path.join(os.getcwd(), "img\\file_icon.png"),
+            # {"name": "File Manager", "icon": os.path.join(os.getcwd(), "img\\file_icon.png"),
             # "action": self.open_file_manager},
             {"name": "Settings", "icon": os.path.join(os.getcwd(), "img\\sys\\settings_icon.png"),
              "action": self.open_settings},
-            {"name": "WitchCraft", "icon": os.path.join(os.getcwd(), "img\\sys\\musical-note.png"), "action": self.open_yii_app},
+            {"name": "WitchCraft", "icon": os.path.join(os.getcwd(), "img\\sys\\musical-note.png"),
+             "action": self.open_yii_app},
             {"name": "White War", "icon": os.path.join(os.getcwd(), "img\\sys\\file_icon.png"),
              "action": self.open_image_viewer},
+            {"name": "Stock Analyzer", "icon": os.path.join(os.getcwd(), "img\\sys\\chart_icon.png"),
+             "action": self.open_stock_analyzer},  # Nowa ikona
         ]
 
         for i, icon_data in enumerate(icons_data):
@@ -380,8 +412,45 @@ class OS:
 
     def update_time(self):
         current_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        self.time_label.config(text=current_time)
-        self.root.after(1000, self.update_time)
+        #self.time_label.config(text=current_time)
+        #self.root.after(1000, self.update_time)
+
+    def open_yii_app(self):
+        try:
+            # Podmień "192.168.1.100" na adres IP serwera, na którym jest Yii
+            webbrowser.open("yii-application.test")
+        except webbrowser.Error as e:
+            messagebox.showerror("Error", f"Nie można otworzyć przeglądarki: {e}")
+
+    def open_image_viewer(self):
+        if "image_viewer" not in self.app_windows or not self.app_windows["image_viewer"].winfo_exists():
+            image_viewer_window = tk.Toplevel(self.root)
+            self.app_windows["image_viewer"] = image_viewer_window
+            ImageViewerApp(image_viewer_window)
+            self.add_taskbar_button("image_viewer", "Image Viewer", image_viewer_window)
+        else:
+            self.app_windows["image_viewer"].lift()
+
+    def open_stock_analyzer(self):
+        if "stock_analyzer" not in self.app_windows or not self.app_windows["stock_analyzer"].winfo_exists():
+            stock_analyzer_window = tk.Toplevel(self.root)
+            stock_analyzer_window.title("Stock Analyzer")
+            self.app_windows["stock_analyzer"] = stock_analyzer_window
+            self.create_stock_analyzer_widgets(stock_analyzer_window)
+            self.add_taskbar_button("stock_analyzer", "Stock Analyzer", stock_analyzer_window)
+        else:
+            self.app_windows["stock_analyzer"].lift()
+
+    def create_stock_analyzer_widgets(self, parent):
+        tk.Label(parent, text="Stock Symbol:").pack()
+        self.stock_entry = tk.Entry(parent, width=20)
+        self.stock_entry.pack()
+
+        search_button = tk.Button(parent, text="Search", command=self.search_stock)
+        search_button.pack()
+
+        self.result_box = scrolledtext.ScrolledText(parent, width=60, height=5)
+        self.result_box.pack()
 
     def open_file_manager(self):
         if "file_manager" not in self.app_windows or not self.app_windows["file_manager"].winfo_exists():
@@ -593,35 +662,170 @@ class OS:
             elif window.winfo_state() == "iconic":
                 print("zminimalizowane")
 
-    def open_image_viewer(self):
-        if "image_viewer" not in self.app_windows or not self.app_windows["image_viewer"].winfo_exists():
-            image_viewer_window = tk.Toplevel(self.root)
-            self.app_windows["image_viewer"] = image_viewer_window
-            ImageViewerApp(image_viewer_window)
-            self.add_taskbar_button("image_viewer", "Image Viewer", image_viewer_window)
-        else:
-            self.app_windows["image_viewer"].lift()
+    def search_stock(self):
+        symbol = self.stock_entry.get()
 
-    def open_yii_app(self):
         try:
-            # Podmień "192.168.1.100" na adres IP serwera, na którym jest Yii
-            webbrowser.open("yii-application.test")
-        except webbrowser.Error as e:
-            messagebox.showerror("Error", f"Nie można otworzyć przeglądarki: {e}")
+            response = requests.post(self.SERVER_URL, json={"symbol": symbol})
+            data = response.json()
+
+            if "message" in data:
+                self.result_box.delete(1.0, tk.END)
+                self.result_box.insert(tk.END, f"Data saved: {symbol}_history.csv")
+                self.show_plot(f"{symbol}_history.csv")
+            else:
+                self.result_box.delete(1.0, tk.END)
+                self.result_box.insert(tk.END, "Error: " + data.get("error", "Unknown error"))
+        except Exception as e:
+            messagebox.showerror("Error", f"Could not connect to server: {e}")
+
+    def show_plot(self, file_path):
+        try:
+            df = pd.read_csv(file_path)
+            df["Close"] = pd.to_numeric(df["Close"], errors='coerce')
+            df["Date"] = pd.to_datetime(df["Date"])
+
+            plt.figure(figsize=(10, 5))
+            plt.plot(df["Date"], df["Close"], marker='o', linestyle='-')
+            plt.xlabel("Date")
+            plt.ylabel("Closing Price")
+            plt.title("Stock Price Chart")
+            plt.xticks(rotation=45)
+            plt.grid()
+            plt.show()
+        except Exception as e:
+            messagebox.showerror("Error", f"Could not display plot: {e}")
+
+    def start_tornado_server(self):
+        if self.tornado_thread is None or not self.tornado_thread.is_alive():
+            self.tornado_thread = threading.Thread(target=self.run_tornado, daemon=True)
+            self.tornado_thread.start()
+            self.SERVER_URL = "http://localhost:8888/search"
+        else:
+            print("Serwer Tornado już działa.")
+
+    def stop_tornado_server(self):
+        if self.tornado_thread and self.tornado_thread.is_alive():
+            tornado.ioloop.IOLoop.current().add_callback(tornado.ioloop.IOLoop.current().stop)
+            self.tornado_thread.join()
+            self.tornado_thread = None
+            print("Serwer Tornado zatrzymany.")
+        else:
+            print("Serwer Tornado nie jest uruchomiony.")
+
+    def run_tornado(self):
+        try:
+            app = tornado.web.Application([(r"/search", StockSearchHandler)])
+            app.listen(8888)  # Można zmienić port, np. na 8889, jeśli 8888 jest zajęty
+            print("✅ Tornado server running on http://localhost:8888")
+            tornado.ioloop.IOLoop.current().start()
+        except OSError as e:
+            if e.errno == 10048:  # Port jest zajęty
+                print("❌ Port 8888 jest zajęty. Spróbuj innego portu.")
+                # Opcjonalnie: Można spróbować automatycznie znaleźć wolny port
+            else:
+                print(f"❌ Błąd serwera Tornado: {e}")
+        except Exception as e:
+            print(f"❌ Nieznany błąd serwera Tornado: {e}")
 
 
-def example_process(name, delay):
-    print(f"Process {name} is starting")
-    time.sleep(delay)
-    print(f"Process {name} is finishing")
-    return f"Process {name} completed after {delay} seconds."
+# ... (Projekt 1 - funkcje example_process i warunek if __name__ == "__main__" - bez zmian) ...
 
+# Backend Tornado API (bez zmian, umieszczamy poza klasą OS)
+class StockSearchHandler(tornado.web.RequestHandler):
+    def post(self):
+        data = json.loads(self.request.body)
+        stock_symbol = data.get("symbol")
+
+        if not stock_symbol:
+            self.write({"error": "Brak symbolu giełdowego."})
+            return
+
+        url = f"https://finance.yahoo.com/quote/{stock_symbol}/history?p={stock_symbol}"
+
+        try:
+            response = requests.get(url)
+            soup = BeautifulSoup(response.text, "html.parser")
+            rows = soup.find_all("tr")
+
+            history = []
+            for row in rows[1:]:  # Pomijamy nagłówek
+                cols = row.find_all("td")
+                if len(cols) < 6:
+                    continue
+                history.append([
+                    cols[0].text,  # Data
+                    cols[1].text,  # Open
+                    cols[2].text,  # High
+                    cols[3].text,  # Low
+                    cols[4].text,  # Close
+                    cols[5].text  # Volume
+                ])
+
+            df = pd.DataFrame(history, columns=["Date", "Open", "High", "Low", "Close", "Volume"])
+            df.to_csv(f"{stock_symbol}_history.csv", index=False)
+
+            self.write({"message": "Dane zapisane", "path": f"{stock_symbol}_history.csv"})
+        except Exception as e:
+            self.write({"error": str(e)})
+
+
+# Uruchamianie Tornado w osobnym wątku
+def run_tornado():
+    app = tornado.web.Application([(r"/search", StockSearchHandler)])
+    app.listen(8888)
+    print("✅ Serwer Tornado działa na http://localhost:8888")
+    tornado.ioloop.IOLoop.current().start()
+
+
+tornado_thread = threading.Thread(target=run_tornado, daemon=True)
+tornado_thread.start()
+
+# GUI Tkinter
+SERVER_URL = "http://localhost:8888/search"
+
+
+def search_stock():
+    symbol = stock_entry.get()
+
+    try:
+        response = requests.post(SERVER_URL, json={"symbol": symbol})
+        data = response.json()
+
+        if "message" in data:
+            result_box.delete(1.0, tk.END)
+            result_box.insert(tk.END, f"Dane zapisane: {symbol}_history.csv")
+            show_plot(f"{symbol}_history.csv")
+        else:
+            result_box.delete(1.0, tk.END)
+            result_box.insert(tk.END, "Błąd: " + data.get("error", "Nieznany błąd"))
+    except Exception as e:
+        messagebox.showerror("Błąd", f"Nie można połączyć się z serwerem: {e}")
+
+
+def show_plot(file_path):
+    try:
+        df = pd.read_csv(file_path)
+        df["Close"] = pd.to_numeric(df["Close"], errors='coerce')
+        df["Date"] = pd.to_datetime(df["Date"])
+
+        plt.figure(figsize=(10, 5))
+        plt.plot(df["Date"], df["Close"], marker='o', linestyle='-')
+        plt.xlabel("Data")
+        plt.ylabel("Cena zamknięcia")
+        plt.title("Wykres cen akcji")
+        plt.xticks(rotation=45)
+        plt.grid()
+        plt.show()
+    except Exception as e:
+        messagebox.showerror("Błąd", f"Nie można wyświetlić wykresu: {e}")
 
 if __name__ == "__main__":
-    root = tk.Tk()
+    root = tk.Tk()  # Tworzymy główne okno Tkinter
     root.title("WW Space")
     root.geometry("800x600")
-    my_os = OS(root)
+    my_os = OS(root)  # Tworzymy instancję OS i przekazujemy jej root
 
-    root.protocol("WM_DELETE_WINDOW", lambda: my_os.stop_scheduler() or root.destroy())
-    root.mainloop()
+    # Ważne: Zamykamy wątek Tornado przy zamykaniu aplikacji Tkinter
+    root.protocol("WM_DELETE_WINDOW", lambda: [tornado.ioloop.IOLoop.current().stop(), root.destroy()])
+    root.mainloop()  # Uruchamiamy pętlę główną Tkinter
