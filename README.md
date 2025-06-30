@@ -14,4 +14,4 @@ Project is created with:
 * Apache
 * MySQL
 
-![image alt](https://github.com/PiotrIT2015/OS-WW-P/blob/screenshot.jpeg?raw=true)
+![image alt](https://github.com/PiotrIT2015/OS-WW-P/blob/master/screenshot.jpeg?raw=true)
