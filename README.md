@@ -2,10 +2,18 @@
 
 ## Table of contents
 * [General info](#general-info)
+* [Running](#running)
 * [Technologies](#technologies)
 
 ## General info
 A simple OS simulation with desktop.
+
+## Running
+
+```
+pip install -r requirements.txt
+python main.py
+```
 	
 ## Technologies
 Project is created with:
