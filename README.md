@@ -8,6 +8,17 @@
 ## General info
 A simple OS simulation with desktop.
 
+1. **WhiteWdarf**
+WhiteDwarf is an advanced search engine project that expands upon the foundational concepts of a basic version I previously developed in Java.
+The initial Java prototype served as a proof-of-concept during my academic studies and was successfully presented at several university and 
+local tech conferences, showcasing my early work in information retrieval systems.
+
+This current iteration, WhiteDwarf, is being developed in Python and aims to tackle more complex challenges in search engine design. 
+It focuses on implementing more sophisticated indexing algorithms, improving search result relevance through advanced ranking mechanisms, 
+and exploring efficient methods for handling larger datasets. The goal is to create a robust and scalable search solution.
+
+
+
 ## Running
 
 ```
