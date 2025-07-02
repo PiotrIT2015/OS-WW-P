@@ -29,10 +29,9 @@ This script allow to organize you files better through showing their containing 
 
 ## Running
 
-```
-pip install -r requirements.txt
-python main.py
-```
+1. double click on `install-require-libraries.bat`
+2. add python and ReactJS to PATH
+3. double click on `wwp.bat`
 	
 ## Technologies
 Project is created with:
