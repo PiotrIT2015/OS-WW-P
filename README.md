@@ -22,6 +22,9 @@ It is a clone of Youtube. To use it you have to download project 'RelaxationTube
 3. **StockAnalyzer**
 This script you can use analyze stock market by stocks.
 
+3. **WhiteWar Explorer**
+This script allow to organize you files better through showing their containing and run relaxing music in background.
+
 
 
 ## Running
