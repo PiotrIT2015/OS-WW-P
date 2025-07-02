@@ -42,3 +42,9 @@ Project is created with:
 * MySQL
 
 ![image alt](https://github.com/PiotrIT2015/OS-WW-P/blob/master/screenshot.jpeg?raw=true)
+
+![image alt](https://github.com/PiotrIT2015/OS-WW-P/blob/master/screenshot-stock-analyzer.jpg?raw=true)
+
+![image alt](https://github.com/PiotrIT2015/OS-WW-P/blob/master/screenshot-whitedwarf.jpg?raw=true)
+
+![image alt](https://github.com/PiotrIT2015/OS-WW-P/blob/master/screenshot-whitewar-explorer.jpg?raw=true)
