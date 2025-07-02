@@ -16,8 +16,11 @@ This current iteration, WhiteDwarf, is being developed in Python and aims to tac
 It focuses on implementing more sophisticated indexing algorithms, improving search result relevance through advanced ranking mechanisms, 
 and exploring efficient methods for handling larger datasets. The goal is to create a robust and scalable search solution.
 
-1. **Witchcraft**
+2. **Witchcraft**
 It is a clone of Youtube. To use it you have to download project 'RelaxationTube' from repository.
+
+3. **StockAnalyzer**
+This script you can use analyze stock market by stocks.
 
 
 
