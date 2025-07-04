@@ -29,8 +29,10 @@ This script allow to organize you files better through showing their containing 
 
 ## Running
 
-1. double click on `install-require-libraries.bat`
-2. double click on `wwp.bat`
+1. `winget install Python.Python.3.10`(via cmd)
+2. add python to PATH
+3. double click on `install-require-libraries.bat`
+4. double click on `wwp.bat`
 	
 ## Technologies
 Project is created with:
