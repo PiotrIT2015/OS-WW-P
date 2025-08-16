@@ -9,3 +9,7 @@ textblob
 numpy
 scipy
 scikit-learn
+pygtk
+gtk
+sys
+os
