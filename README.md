@@ -28,6 +28,10 @@ allows for the interaction of computer units and manipulation of shared data.
 As part of the project, a python script was commissioned to compare CSV files. These are large files, up to several hundred thousand lines 
 in length.
 
+4. **NetworkMonitor**
+I've always would like to implement this project in Java since the university. Unfortunately those days there wasn't such a great 
+tools i.e.chatGPT . It is only a shortcut to run a file[*.jar] . 
+
 
 
 ## Running
