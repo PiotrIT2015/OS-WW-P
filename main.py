@@ -580,7 +580,7 @@ class OS:
     def launch_java_app(self):
         """Uruchamia zewnętrzną aplikację Java."""
         # UWAGA: Zmień 'path/to/your/app.jar' na rzeczywistą ścieżkę do Twojego pliku .jar
-        jar_path = "path/to/your/app.jar"
+        jar_path = "NetworkMonitor.jar"
         java_command = ["java", "-jar", jar_path]
         
         if not os.path.exists(jar_path):
