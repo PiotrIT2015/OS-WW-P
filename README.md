@@ -19,11 +19,14 @@ and exploring efficient methods for handling larger datasets. The goal is to cre
 2. **Witchcraft**
 It is a clone of Youtube. To use it you have to download project 'RelaxationTube' from repository.
 
-3. **StockAnalyzer**
-This script you can use analyze stock market by stocks.
+3. **PCAAnalyzer**
+As part of the master's thesis, was created a web application that analyzes data from many files, ending a presentation data on the charts. 
+There was implemented a statistical algorithm (PCA) for data analysis. Asynchronous communication, enabled by the framework, 
+allows for the interaction of computer units and manipulation of shared data.
 
-3. **WhiteWar Explorer**
-This script allow to organize you files better through showing their containing and run relaxing music in background.
+3. **PandasAnalyzer**
+As part of the project, a python script was commissioned to compare CSV files. These are large files, up to several hundred thousand lines 
+in length.
 
 
 
@@ -31,6 +34,7 @@ This script allow to organize you files better through showing their containing 
 
 1. `winget install Python.Python.3.10`(via cmd)
 2. add python to PATH
+3. `docker-compose up\down`
 3. double click on `install-require-libraries.bat`
 4. double click on `wwp.bat`
 	
@@ -43,8 +47,4 @@ Project is created with:
 
 ![image alt](https://github.com/PiotrIT2015/OS-WW-P/blob/master/screenshot.jpeg?raw=true)
 
-![image alt](https://github.com/PiotrIT2015/OS-WW-P/blob/master/screenshot-stock-analyzer.jpg?raw=true)
 
-![image alt](https://github.com/PiotrIT2015/OS-WW-P/blob/master/screenshot-whitedwarf.jpg?raw=true)
-
-![image alt](https://github.com/PiotrIT2015/OS-WW-P/blob/master/screenshot-whitewar-explorer.jpg?raw=true)
