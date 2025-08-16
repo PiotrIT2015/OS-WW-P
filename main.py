@@ -549,8 +549,9 @@ class OS:
             {"name": "Pandas Analyzer", "icon": "chart_icon.png", "action": self.open_pandas_analyzer},
             {"name": "PCA Analyzer", "icon": "chart_icon.png", "action": self.open_pca_analyzer},
             {"name": "White Dwarf Search", "icon": "browser.png", "action": lambda: open_white_dwarf(self)},
-            ### NOWOŚĆ: Dodano nową ikonę i akcję otwierającą Shodan ###
             {"name": "WhiteDwarf Shodan", "icon": "browser.png", "action": self.open_white_dwarf_shodan},
+            ### NOWOŚĆ: Ikona do uruchamiania aplikacji Java ###
+            {"name": "Network Monitor", "icon": "programming.png", "action": self.launch_java_app},
             {"name": "WitchCraft (Web)", "icon": "musical-note.png", "action": self.open_yii_app},
             {"name": "Settings", "icon": "settings_icon.png", "action": self.open_settings},
         ]
@@ -568,13 +569,33 @@ class OS:
             except Exception as e:
                 print(f"Błąd podczas tworzenia ikony '{icon_data['name']}': {e}")
 
-    ### NOWOŚĆ: Nowa funkcja do otwierania strony Shodan.io ###
     def open_white_dwarf_shodan(self):
         """Otwiera stronę shodan.io w domyślnej przeglądarce."""
         try:
             webbrowser.open("https://www.shodan.io")
         except webbrowser.Error as e:
             messagebox.showerror("Błąd", f"Nie można otworzyć przeglądarki: {e}")
+            
+    ### NOWOŚĆ: Nowa funkcja do uruchamiania zewnętrznej aplikacji Java ###
+    def launch_java_app(self):
+        """Uruchamia zewnętrzną aplikację Java."""
+        # UWAGA: Zmień 'path/to/your/app.jar' na rzeczywistą ścieżkę do Twojego pliku .jar
+        jar_path = "path/to/your/app.jar"
+        java_command = ["java", "-jar", jar_path]
+        
+        if not os.path.exists(jar_path):
+            messagebox.showerror("Błąd", f"Nie można znaleźć pliku aplikacji Java: {jar_path}\nUpewnij się, że plik istnieje i ścieżka jest poprawna.")
+            return
+
+        try:
+            print(f"Uruchamianie aplikacji Java: {' '.join(java_command)}")
+            # Używamy Popen, aby nie blokować interfejsu graficznego
+            subprocess.Popen(java_command)
+        except FileNotFoundError:
+            messagebox.showerror("Błąd", "Polecenie 'java' nie zostało znalezione.\nCzy Java jest zainstalowana i znajduje się w ścieżce systemowej (PATH)?")
+        except Exception as e:
+            messagebox.showerror("Błąd", f"Nie udało się uruchomić aplikacji Java: {e}")
+
 
     def open_yii_app(self):
         try:
