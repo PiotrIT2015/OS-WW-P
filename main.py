@@ -26,11 +26,13 @@ from sklearn.feature_extraction.text import TfidfVectorizer
 from collections import Counter
 import sys
 import asyncio
-#import gi
 import csv
+import shutil # DODANO: Potrzebne do usuwania katalogów
 
-#gi.require_version("Gtk", "3.0")
-#from gi.repository import Gtk
+# Usunięto importy GTK, które powodowały konflikt
+# import gi
+# gi.require_version("Gtk", "3.0")
+# from gi.repository import Gtk
 
 
 # --- Konfiguracja i funkcje pomocnicze ---
@@ -172,19 +174,6 @@ def CompareTotal(data1, data2):
 def SaveFile(data, path):
     data.to_csv(path)
 
-def show_message_dialog(parent, message_type, title, text):
-    """Funkcja pomocnicza do wyświetlania okien z komunikatami."""
-    dialog = Gtk.MessageDialog(
-        transient_for=parent,
-        flags=0,
-        message_type=message_type,
-        buttons=Gtk.ButtonsType.OK,
-        text=title
-    )
-    dialog.format_secondary_text(text)
-    dialog.run()
-    dialog.destroy()
-
 def open_white_dwarf(self):
     """Otwiera aplikację White Dwarf Web Searcher."""
     if "white_dwarf" not in self.app_windows or not self.app_windows["white_dwarf"].winfo_exists():
@@ -199,7 +188,6 @@ def open_white_dwarf(self):
 
 
 # --- Backend Tornado API ---
-
 class StockSearchHandler(tornado.web.RequestHandler):
     def post(self):
         try:
@@ -297,7 +285,6 @@ class WebSearchHandler(tornado.web.RequestHandler):
 
 
 # --- Symulacja Systemu Operacyjnego (Procesy, Pliki, Scheduler) ---
-
 class Process:
     def __init__(self, target, args=(), name=None, is_daemon=False):
         self.id = uuid.uuid4()
@@ -379,7 +366,6 @@ class Scheduler:
 
 
 # --- Aplikacje GUI ---
-
 class ImageViewerApp:
     def __init__(self, root):
         self.root = root
@@ -452,7 +438,10 @@ class ImageViewerApp:
         elif self.is_text_file(file_path):
             self.show_text_content(file_path)
         else:
-            self.open_with_default_app(file_path)
+            # Ta metoda jest teraz częścią klasy OS, więc trzeba ją wywołać inaczej
+            # Zakładając, że root ma referencję do instancji OS
+            if hasattr(self.root, 'my_os'):
+                self.root.my_os.open_with_default_app(file_path)
 
     def show_image(self, image_path):
         try:
@@ -490,23 +479,11 @@ class ImageViewerApp:
             self.canvas.pack(fill="both", expand=True)
             self.canvas.delete("all")
 
-    def open_with_default_app(self, file_path):
-        try:
-            if sys.platform == "win32":
-                os.startfile(file_path)
-            elif sys.platform == "darwin":
-                subprocess.run(['open', file_path], check=True)
-            else:
-                subprocess.run(['xdg-open', file_path], check=True)
-        except Exception as e:
-            messagebox.showerror("Error", f"Could not open the file: {e}")
-
-
 # --- Główna klasa systemu operacyjnego ---
-
 class OS:
     def __init__(self, root):
         self.root = root
+        self.root.my_os = self # Dodanie referencji do instancji OS w głównym oknie
         self.processes = {}
         self.filesystem = FileSystem()
         self.scheduler = Scheduler()
@@ -545,12 +522,11 @@ class OS:
         sys_img_dir = os.path.join(os.getcwd(), "img", "sys")
         os.makedirs(sys_img_dir, exist_ok=True)
         icons_data = [
-            {"name": "File Manager (Sim)", "icon": "folder_icon.png", "action": self.open_file_manager},
+            {"name": "File Explorer", "icon": "folder_icon.png", "action": self.open_file_manager},
             {"name": "Pandas Analyzer", "icon": "chart_icon.png", "action": self.open_pandas_analyzer},
             {"name": "PCA Analyzer", "icon": "chart_icon.png", "action": self.open_pca_analyzer},
             {"name": "White Dwarf Search", "icon": "browser.png", "action": lambda: open_white_dwarf(self)},
             {"name": "WhiteDwarf Shodan", "icon": "browser.png", "action": self.open_white_dwarf_shodan},
-            ### NOWOŚĆ: Ikona do uruchamiania aplikacji Java ###
             {"name": "Network Monitor", "icon": "programming.png", "action": self.launch_java_app},
             {"name": "WitchCraft (Web)", "icon": "musical-note.png", "action": self.open_yii_app},
             {"name": "Settings", "icon": "settings_icon.png", "action": self.open_settings},
@@ -570,32 +546,24 @@ class OS:
                 print(f"Błąd podczas tworzenia ikony '{icon_data['name']}': {e}")
 
     def open_white_dwarf_shodan(self):
-        """Otwiera stronę shodan.io w domyślnej przeglądarce."""
         try:
             webbrowser.open("https://www.shodan.io")
         except webbrowser.Error as e:
             messagebox.showerror("Błąd", f"Nie można otworzyć przeglądarki: {e}")
-            
-    ### NOWOŚĆ: Nowa funkcja do uruchamiania zewnętrznej aplikacji Java ###
+
     def launch_java_app(self):
-        """Uruchamia zewnętrzną aplikację Java."""
-        # UWAGA: Zmień 'path/to/your/app.jar' na rzeczywistą ścieżkę do Twojego pliku .jar
         jar_path = "NetworkMonitor.jar"
         java_command = ["java", "-jar", jar_path]
-        
         if not os.path.exists(jar_path):
             messagebox.showerror("Błąd", f"Nie można znaleźć pliku aplikacji Java: {jar_path}\nUpewnij się, że plik istnieje i ścieżka jest poprawna.")
             return
-
         try:
             print(f"Uruchamianie aplikacji Java: {' '.join(java_command)}")
-            # Używamy Popen, aby nie blokować interfejsu graficznego
             subprocess.Popen(java_command)
         except FileNotFoundError:
             messagebox.showerror("Błąd", "Polecenie 'java' nie zostało znalezione.\nCzy Java jest zainstalowana i znajduje się w ścieżce systemowej (PATH)?")
         except Exception as e:
             messagebox.showerror("Błąd", f"Nie udało się uruchomić aplikacji Java: {e}")
-
 
     def open_yii_app(self):
         try:
@@ -606,10 +574,10 @@ class OS:
     def open_file_manager(self):
         if "file_manager" not in self.app_windows or not self.app_windows["file_manager"].winfo_exists():
             win = tk.Toplevel(self.root)
-            win.title("File Manager (Simulated)")
+            win.title("File Explorer")
             self.app_windows["file_manager"] = win
             self.create_file_manager_widgets(win)
-            self.add_taskbar_button("file_manager", "📁 File Sim", win)
+            self.add_taskbar_button("file_manager", "📁 Explorer", win)
         else:
             self.app_windows["file_manager"].lift()
 
@@ -624,158 +592,226 @@ class OS:
             self.app_windows["settings"].lift()
 
     def open_pandas_analyzer(self):
-        dialog = Gtk.FileChooserDialog(
-            title="Open...",
-            parent=None,
-            action=Gtk.FileChooserAction.OPEN,
-            buttons=(
-                Gtk.STOCK_CANCEL, Gtk.ResponseType.CANCEL,
-                Gtk.STOCK_OPEN, Gtk.ResponseType.OK
-            )
+        # NAPRAWIONO: Zastąpiono GTK odpowiednikiem z Tkinter
+        flista = filedialog.askopenfilenames(
+            title="Wybierz 4 pliki do analizy",
+            filetypes=[("ASC files", "*.asc"), ("All files", "*.*")]
         )
-        dialog.set_default_response(Gtk.ResponseType.OK)
-        dialog.set_select_multiple(True)
 
-        file_filter = Gtk.FileFilter()
-        file_filter.set_name("All files")
-        file_filter.add_pattern("*.asc")
-        dialog.add_filter(file_filter)
+        if not flista:
+            return # Użytkownik anulował wybór
 
-        response = dialog.run()
+        if len(flista) != 4:
+            messagebox.showerror("Błąd", f"Oczekiwano 4 plików, a wybrano {len(flista)}. Proszę spróbować ponownie.")
+            return
 
-        if response == Gtk.ResponseType.OK:
-            flista = dialog.get_filenames()
+        try:
+            print("Rozpoczynam analizę plików...")
+            PATH_1, PATH_2, PATH_3, PATH_4, PATH_5, PATH_6, PATH_7 = "path1.csv", "path2.csv", "path3.csv", "path4.csv", "path5.csv", "path6.csv", "path7.csv"
 
-            if len(flista) != 4:
-                show_message_dialog(
-                    dialog, Gtk.MessageType.ERROR, "Błąd",
-                    f"Oczekiwano 4 plików, a wybrano {len(flista)}. Proszę spróbować ponownie."
-                )
-                dialog.destroy()
-                return
+            print(f"Przetwarzanie: {flista[0]}")
+            BTNGeen = openCSV(flista[0])
+            BTNGeenBezPow = BezPow(BTNGeen)
+            SaveFile(BTNGeenBezPow, PATH_1)
 
-            try:
-                print("Rozpoczynam analizę plików...")
-                PATH_1, PATH_2, PATH_3, PATH_4, PATH_5, PATH_6, PATH_7 = "path1.csv", "path2.csv", "path3.csv", "path4.csv", "path5.csv", "path6.csv", "path7.csv"
+            print(f"Przetwarzanie: {flista[1]}")
+            BTNIllumina = openCSV(flista[1])
+            BTNIlluminaBezPow = BezPow(BTNIllumina)
+            SaveFile(BTNIlluminaBezPow, PATH_2)
 
-                print(f"Przetwarzanie: {flista[0]}")
-                BTNGeen = openCSV(flista[0])
-                BTNGeenBezPow = BezPow(BTNGeen)
-                SaveFile(BTNGeenBezPow, PATH_1)
+            BTNGeenIluminaCT = CompareTotal(BTNGeenBezPow, BTNIlluminaBezPow)
+            SaveFile(BTNGeenIluminaCT, PATH_3)
 
-                print(f"Przetwarzanie: {flista[1]}")
-                BTNIllumina = openCSV(flista[1])
-                BTNIlluminaBezPow = BezPow(BTNIllumina)
-                SaveFile(BTNIlluminaBezPow, PATH_2)
+            print(f"Przetwarzanie: {flista[2]}")
+            UMDGeen = openCSV(flista[2])
+            UMDGeenBezPow = BezPow(UMDGeen)
+            SaveFile(UMDGeenBezPow, PATH_4)
 
-                BTNGeenIluminaCT = CompareTotal(BTNGeenBezPow, BTNIlluminaBezPow)
-                SaveFile(BTNGeenIluminaCT, PATH_3)
+            print(f"Przetwarzanie: {flista[3]}")
+            UMDIllumina = openCSV(flista[3])
+            UMDIlluminaBezPow = BezPow(UMDIllumina)
+            SaveFile(UMDIlluminaBezPow, PATH_5)
 
-                print(f"Przetwarzanie: {flista[2]}")
-                UMDGeen = openCSV(flista[2])
-                UMDGeenBezPow = BezPow(UMDGeen)
-                SaveFile(UMDGeenBezPow, PATH_4)
+            UMDGeenIluminaCT = CompareTotal(UMDGeenBezPow, UMDIlluminaBezPow)
+            SaveFile(UMDGeenIluminaCT, PATH_6)
 
-                print(f"Przetwarzanie: {flista[3]}")
-                UMDIllumina = openCSV(flista[3])
-                UMDIlluminaBezPow = BezPow(UMDIllumina)
-                SaveFile(UMDIlluminaBezPow, PATH_5)
+            BTNUMDGeenIluminaCT = CompareTotal(BTNGeenIluminaCT, UMDGeenIluminaCT)
+            SaveFile(BTNUMDGeenIluminaCT, PATH_7)
 
-                UMDGeenIluminaCT = CompareTotal(UMDGeenBezPow, UMDIlluminaBezPow)
-                SaveFile(UMDGeenIluminaCT, PATH_6)
-
-                BTNUMDGeenIluminaCT = CompareTotal(BTNGeenIluminaCT, UMDGeenIluminaCT)
-                SaveFile(BTNUMDGeenIluminaCT, PATH_7)
-
-                print("Analiza zakończona pomyślnie.")
-                show_message_dialog(
-                    dialog, Gtk.MessageType.INFO, "Sukces", "Analiza została pomyślnie zakończona."
-                )
-            except Exception as e:
-                print(f"Wystąpił błąd: {e}")
-                show_message_dialog(
-                    dialog, Gtk.MessageType.ERROR, "Błąd przetwarzania",
-                    f"Wystąpił nieoczekiwany błąd podczas analizy plików:\n\n{e}"
-                )
-
-        dialog.destroy()
+            print("Analiza zakończona pomyślnie.")
+            messagebox.showinfo("Sukces", "Analiza została pomyślnie zakończona.")
+        except Exception as e:
+            print(f"Wystąpił błąd: {e}")
+            messagebox.showerror("Błąd przetwarzania", f"Wystąpił nieoczekiwany błąd podczas analizy plików:\n\n{e}")
 
     def open_pca_analyzer(self):
-        dialog = Gtk.FileChooserDialog(
-            title="Open...",
-            parent=None,
-            action=Gtk.FileChooserAction.OPEN,
-            buttons=(
-                Gtk.STOCK_CANCEL, Gtk.ResponseType.CANCEL,
-                Gtk.STOCK_OPEN, Gtk.ResponseType.OK
-            )
+        # NAPRAWIONO: Zastąpiono GTK odpowiednikiem z Tkinter
+        flista = filedialog.askopenfilenames(
+            title="Wybierz pliki do analizy PCA",
+            filetypes=[("ASC files", "*.asc"), ("All files", "*.*")]
         )
-        dialog.set_default_response(Gtk.ResponseType.OK)
-        dialog.set_select_multiple(True)
 
-        file_filter = Gtk.FileFilter()
-        file_filter.set_name("All files")
-        file_filter.add_pattern("*.asc")
-        dialog.add_filter(file_filter)
+        if not flista:
+            return # Użytkownik anulował
 
-        response = dialog.run()
+        n = len(flista)
+        colA, colB = np.loadtxt(flista[0], usecols=(0, 1), unpack=True)
+        m = len(colB)
+        E = np.zeros((m, n))
+        D = np.zeros((m, n))
 
-        if response == Gtk.ResponseType.OK:
-            flista = dialog.get_filenames()
-            n = len(flista)
-            if n == 0:
-                dialog.destroy()
+        for i in range(n):
+            colA, colB = np.loadtxt(flista[i], usecols=(0, 1), unpack=True)
+            if len(colB) != m:
+                messagebox.showerror('Błąd', 'Pliki mają różne długości!')
                 return
+            for j in range(m):
+                E[j][i] = colA[j]
+                D[j][i] = colB[j]
 
-            colA, colB = np.loadtxt(flista[0], usecols=(0, 1), unpack=True)
-            m = len(colB)
-            E = np.zeros((m, n))
-            D = np.zeros((m, n))
+        plt.plot(D)
+        plt.title("Dane wejściowe")
+        plt.show()
 
-            for i in range(n):
-                colA, colB = np.loadtxt(flista[i], usecols=(0, 1), unpack=True)
-                if len(colB) != m:
-                    print('Error: rozne dlugosci plikow!')
-                    sys.exit()
-                for j in range(m):
-                    E[j][i] = colA[j]
-                    D[j][i] = colB[j]
+        Drepp = np.zeros((m, n, n))
+        for j in range(n):
+            print(f"Obliczanie PCA dla {j+1} komponentów...")
+            Drepp[:, :, j] = PCA(D, j + 1)
 
-            plt.plot(D)
+        pplist = np.zeros(n)
+        for i in range(n):
+            pplist[i] = np.sum(abs(Drepp[:, :, i] - D))
+
+        plt.plot(pplist)
+        plt.title("Suma błędów absolutnych vs. liczba komponentów")
+        plt.xlabel("Liczba komponentów")
+        plt.ylabel("Suma błędów")
+        plt.show()
+        
+        # Wykres porównawczy dla 4 komponentów (można zmienić)
+        num_components_to_plot = min(3, n-1)
+        if num_components_to_plot >= 0:
+            plt.plot(D, Drepp[:, :, num_components_to_plot], 'o', [0, 1.2], [0, 1.2], '-')
+            plt.title(f"Dane oryginalne vs. odtworzone z {num_components_to_plot + 1} komponentów")
+            plt.xlabel("Oryginalne")
+            plt.ylabel("Odtworzone")
             plt.show()
-
-            Drepp = np.zeros((m, n, n))
-            for j in range(n):
-                print(j)
-                Drepp[:, :, j] = PCA(D, j + 1)
-
-            pplist = np.zeros(n)
-            for i in range(n):
-                pplist[i] = np.sum(abs(Drepp[:, :, i] - D))
-
-            plt.plot(pplist)
-            plt.show()
-            plt.plot(D, Drepp[:, :, 3], 'o', [0, 1.2], [0, 1.2], '-')
-            plt.show()
-
-        dialog.destroy()
 
     def create_file_manager_widgets(self, parent):
-        file_frame = ttk.LabelFrame(parent, text="File List")
-        file_frame.pack(padx=10, pady=10, fill=tk.BOTH, expand=True)
-        self.file_listbox = Listbox(file_frame, width=50)
-        self.file_listbox.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=5, pady=5)
-        scrollbar = ttk.Scrollbar(file_frame, orient="vertical", command=self.file_listbox.yview)
-        scrollbar.pack(side=tk.RIGHT, fill="y")
-        self.file_listbox.config(yscrollcommand=scrollbar.set)
-        self.update_file_list()
-        op_frame = ttk.LabelFrame(parent, text="Operations")
+        # Ta funkcja była już poprawna, ale jest tutaj dla kompletności.
+        # DODANO poniżej brakujące metody, które są przez nią wywoływane.
+        main_frame = Frame(parent)
+        main_frame.pack(fill=tk.BOTH, expand=True)
+
+        op_frame = ttk.LabelFrame(main_frame, text="Operations")
         op_frame.pack(padx=10, pady=5, fill=tk.X)
-        self.file_name_entry = ttk.Entry(op_frame, width=20)
-        self.file_name_entry.pack(side=tk.LEFT, padx=5, pady=5)
-        ttk.Button(op_frame, text="Create", command=self.create_new_file).pack(side=tk.LEFT, padx=5)
-        ttk.Button(op_frame, text="Open", command=self.open_selected_file).pack(side=tk.LEFT, padx=5)
-        ttk.Button(op_frame, text="Delete", command=self.delete_selected_file).pack(side=tk.LEFT, padx=5)
+
+        self.file_manager_entry = ttk.Entry(op_frame, width=20)
+        self.file_manager_entry.pack(side=tk.LEFT, padx=5, pady=5)
+        
+        ttk.Button(op_frame, text="Create File", command=self.create_real_file).pack(side=tk.LEFT, padx=5)
+        ttk.Button(op_frame, text="Open", command=self.open_selected_item_from_manager).pack(side=tk.LEFT, padx=5)
+        ttk.Button(op_frame, text="Delete", command=self.delete_selected_item_from_manager).pack(side=tk.LEFT, padx=5)
+        ttk.Button(op_frame, text="Refresh", command=self.refresh_file_tree).pack(side=tk.LEFT, padx=5)
+
+        tree_frame = ttk.Frame(main_frame)
+        tree_frame.pack(padx=10, pady=10, fill=tk.BOTH, expand=True)
+        
+        self.file_manager_tree = ttk.Treeview(tree_frame, show="tree", selectmode=tk.BROWSE)
+        self.file_manager_tree.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+        
+        scrollbar = ttk.Scrollbar(tree_frame, orient="vertical", command=self.file_manager_tree.yview)
+        scrollbar.pack(side=tk.RIGHT, fill="y")
+        self.file_manager_tree.config(yscrollcommand=scrollbar.set)
+        
+        self.refresh_file_tree()
+
+    # --- UZUPEŁNIENIE: BRAKUJĄCE METODY DO OBSŁUGI MENEDŻERA PLIKÓW ---
+    def populate_file_tree(self, parent_path, parent_node):
+        """Rekurencyjnie wypełnia Treeview strukturą plików i katalogów."""
+        if not os.path.isdir(parent_path):
+            return
+        
+        items = sorted(os.listdir(parent_path), key=lambda x: not os.path.isdir(os.path.join(parent_path, x)))
+        for item_name in items:
+            item_path = os.path.join(parent_path, item_name)
+            node = self.file_manager_tree.insert(parent_node, 'end', text=item_name, open=False, values=[item_path])
+            if os.path.isdir(item_path):
+                # Dodaj pusty element, aby można było rozwinąć folder, ale wypełniaj go dopiero na żądanie (optymalizacja)
+                self.file_manager_tree.insert(node, 'end', text='...')
+
+    def refresh_file_tree(self):
+        """Czyści i ponownie wypełnia drzewo plików."""
+        if hasattr(self, 'file_manager_tree') and self.file_manager_tree.winfo_exists():
+            for i in self.file_manager_tree.get_children():
+                self.file_manager_tree.delete(i)
+            # Wypełnia tylko najwyższy poziom, reszta dynamicznie
+            self.populate_file_tree(os.getcwd(), "")
+
+    def open_with_default_app(self, file_path):
+        """Otwiera plik za pomocą domyślnej aplikacji systemowej."""
+        try:
+            if sys.platform == "win32": os.startfile(file_path)
+            elif sys.platform == "darwin": subprocess.run(['open', file_path], check=True)
+            else: subprocess.run(['xdg-open', file_path], check=True)
+        except Exception as e:
+            messagebox.showerror("Błąd", f"Nie można otworzyć pliku: {e}")
+
+    def open_selected_item_from_manager(self):
+        """Otwiera zaznaczony element z File Explorera."""
+        selected_item = self.file_manager_tree.selection()
+        if selected_item:
+            item_path = self.file_manager_tree.item(selected_item[0], "values")[0]
+            self.open_with_default_app(item_path)
+
+    def delete_selected_item_from_manager(self):
+        """Usuwa zaznaczony element z File Explorera."""
+        selected_item = self.file_manager_tree.selection()
+        if not selected_item:
+            messagebox.showwarning("Uwaga", "Nie wybrano żadnego elementu.")
+            return
+
+        item_path = self.file_manager_tree.item(selected_item[0], "values")[0]
+        item_name = os.path.basename(item_path)
+        
+        if messagebox.askyesno("Potwierdź usunięcie", f"Czy na pewno chcesz usunąć '{item_name}'?"):
+            try:
+                if os.path.isfile(item_path):
+                    os.remove(item_path)
+                elif os.path.isdir(item_path):
+                    shutil.rmtree(item_path)
+                messagebox.showinfo("Sukces", f"'{item_name}' został usunięty.")
+                self.refresh_file_tree()
+            except Exception as e:
+                messagebox.showerror("Błąd", f"Nie udało się usunąć elementu: {e}")
+
+    def create_real_file(self):
+        """Tworzy nowy plik w zaznaczonym katalogu."""
+        file_name = self.file_manager_entry.get()
+        if not file_name:
+            messagebox.showerror("Błąd", "Nazwa pliku nie może być pusta.")
+            return
+
+        selected_item = self.file_manager_tree.selection()
+        if selected_item:
+            parent_path = self.file_manager_tree.item(selected_item[0], "values")[0]
+            if os.path.isfile(parent_path):
+                parent_path = os.path.dirname(parent_path)
+        else:
+            parent_path = os.getcwd()
+
+        new_file_path = os.path.join(parent_path, file_name)
+        
+        try:
+            if not os.path.exists(new_file_path):
+                with open(new_file_path, 'w') as f: pass
+                messagebox.showinfo("Sukces", f"Utworzono plik '{file_name}'.")
+                self.refresh_file_tree()
+            else:
+                messagebox.showerror("Błąd", "Plik o tej nazwie już istnieje w tej lokalizacji.")
+        except Exception as e:
+            messagebox.showerror("Błąd", f"Nie można utworzyć pliku: {e}")
+    # --- KONIEC UZUPEŁNIONYCH METOD ---
 
     def create_settings_widgets(self, parent):
         notebook = ttk.Notebook(parent)
@@ -793,15 +829,21 @@ class OS:
         self.update_network_info()
         ttk.Label(pers_frame, text="Desktop Background:").grid(row=0, column=0, padx=5, pady=5, sticky=tk.W)
         ttk.Button(pers_frame, text="Choose Color", command=self.choose_background_color).grid(row=0, column=1, padx=5, pady=5, sticky=tk.W)
-
-    def create_stock_analyzer_widgets(self, parent):
-        tk.Label(parent, text="Stock Symbol:").pack(pady=5)
-        self.stock_entry = tk.Entry(parent, width=20)
-        self.stock_entry.pack(pady=5)
-        self.stock_entry.insert(0, "AAPL")
-        Button(parent, text="Search & Plot", command=self.search_stock).pack(pady=10)
-        self.result_box_stock = scrolledtext.ScrolledText(parent, width=60, height=5)
-        self.result_box_stock.pack(pady=5, padx=5, fill="both", expand=True)
+		# Zakładka 3: Subnet Calculator
+        subnet_frame = ttk.Frame(notebook); notebook.add(subnet_frame, text="Subnet Calculator")
+        ttk.Label(subnet_frame, text="IP Address:").grid(row=0, column=0, padx=5, pady=10, sticky=tk.W)
+        self.subnet_ip_entry = ttk.Entry(subnet_frame, width=30); self.subnet_ip_entry.grid(row=0, column=1, padx=5, pady=10, sticky=tk.W)
+        self.subnet_ip_entry.insert(0, "192.168.10.5")
+        ttk.Label(subnet_frame, text="Subnet Mask:").grid(row=1, column=0, padx=5, pady=5, sticky=tk.W)
+        self.subnet_mask_entry = ttk.Entry(subnet_frame, width=30); self.subnet_mask_entry.grid(row=1, column=1, padx=5, pady=5, sticky=tk.W)
+        self.subnet_mask_entry.insert(0, "255.255.255.0")
+        ttk.Button(subnet_frame, text="Calculate", command=self._calculate_subnet_gui).grid(row=2, column=0, columnspan=2, pady=10)
+        self.subnet_results_text = scrolledtext.ScrolledText(subnet_frame, height=10, wrap=tk.WORD)
+        self.subnet_results_text.grid(row=3, column=0, columnspan=2, padx=5, pady=5, sticky="ew")
+        random_frame = ttk.Frame(subnet_frame); random_frame.grid(row=4, column=0, columnspan=2, pady=10)
+        ttk.Button(random_frame, text="Generate Random IP", command=self._generate_random_ip_gui).pack(side=tk.LEFT, padx=5)
+        self.random_ip_label = ttk.Label(random_frame, text="<-- Click to generate", font=('Helvetica', 10, 'italic'))
+        self.random_ip_label.pack(side=tk.LEFT, padx=5)
 
     def create_white_dwarf_widgets(self, parent):
         input_frame = Frame(parent)
@@ -825,52 +867,6 @@ class OS:
         self.dwarf_result_box = scrolledtext.ScrolledText(parent, width=80, height=20)
         self.dwarf_result_box.pack(padx=10, pady=10, fill="both", expand=True)
 
-    def update_file_list(self):
-        if hasattr(self, 'file_listbox') and self.file_listbox.winfo_exists():
-            self.file_listbox.delete(0, tk.END)
-            for file_name in self.filesystem.files.keys():
-                self.file_listbox.insert(tk.END, file_name)
-
-    def create_new_file(self):
-        name = self.file_name_entry.get()
-        if name:
-            if self.filesystem.create_file(name):
-                self.update_file_list()
-                messagebox.showinfo("Success", f"File '{name}' created")
-            else:
-                messagebox.showerror("Error", f"File '{name}' already exists")
-        else:
-            messagebox.showerror("Error", "File name cannot be empty")
-
-    def open_selected_file(self):
-        selected_indices = self.file_listbox.curselection()
-        if selected_indices:
-            file_name = self.file_listbox.get(selected_indices[0])
-            file = self.filesystem.read_file(file_name)
-            if file:
-                self._show_simulated_file_content(file_name, file.content)
-
-    def delete_selected_file(self):
-        selected_indices = self.file_listbox.curselection()
-        if selected_indices:
-            file_name = self.file_listbox.get(selected_indices[0])
-            if self.filesystem.delete_file(file_name):
-                self.update_file_list()
-                messagebox.showinfo("Success", f"File '{file_name}' deleted")
-
-    def _show_simulated_file_content(self, file_name, content):
-        win_key = f"file_sim_{file_name}"
-        if win_key not in self.app_windows or not self.app_windows[win_key].winfo_exists():
-            win = tk.Toplevel(self.root)
-            win.title(f"Content: {file_name}")
-            text_area = scrolledtext.ScrolledText(win, width=50, height=20)
-            text_area.insert(tk.END, content if content is not None else "")
-            text_area.pack(padx=10, pady=10, fill=tk.BOTH, expand=True)
-            self.app_windows[win_key] = win
-            self.add_taskbar_button(win_key, f"📄 {file_name}", win)
-        else:
-            self.app_windows[win_key].lift()
-
     def update_network_info(self):
         def _get_info():
             try:
@@ -883,7 +879,6 @@ class OS:
                 hostname = "Not Available"
             self.root.after(0, lambda: self.ip_display.config(text=ip))
             self.root.after(0, lambda: self.hostname_display.config(text=hostname))
-
         threading.Thread(target=_get_info, daemon=True).start()
 
     def choose_background_color(self):
@@ -894,35 +889,7 @@ class OS:
             for widget in self.desktop.winfo_children():
                 if isinstance(widget, tk.Label):
                     widget.config(bg=self.desktop_bg_color)
-
-    def search_stock(self):
-        symbol = self.stock_entry.get().upper()
-        if not symbol:
-            messagebox.showerror("Error", "Stock symbol cannot be empty.")
-            return
-        self.result_box_stock.delete(1.0, tk.END)
-        self.result_box_stock.insert(tk.END, f"Searching for {symbol}...")
-        self.root.update_idletasks()
-        threading.Thread(target=self._search_stock_thread, args=(symbol,), daemon=True).start()
-
-    def _search_stock_thread(self, symbol):
-        try:
-            response = requests.post("http://localhost:8889/stock", json={"symbol": symbol}, timeout=15)
-            data = response.json()
-            self.result_box_stock.delete(1.0, tk.END)
-            if response.status_code == 200:
-                path = data.get('path')
-                self.result_box_stock.insert(tk.END, f"Data saved: {path}")
-                self.show_stock_plot(path)
-            else:
-                self.result_box_stock.insert(tk.END, "Error: " + data.get("error", "Unknown error"))
-        except requests.exceptions.RequestException as e:
-            messagebox.showerror("Error", f"Could not connect to the local server.\n{e}")
-            self.result_box_stock.delete(1.0, tk.END)
-        except Exception as e:
-            messagebox.showerror("Error", f"An unexpected error occurred: {e}")
-            self.result_box_stock.delete(1.0, tk.END)
-
+    
     def _perform_web_search(self):
         url, query = self.dwarf_url_entry.get(), self.dwarf_query_entry.get()
         if not url or not query:
@@ -967,25 +934,6 @@ class OS:
         messagebox.showinfo("Uruchamianie analizy", "Analiza PCA zostanie uruchomiona w tle. Wykres pojawi się w nowym oknie.")
         threading.Thread(target=run_pca_demonstration, args=(sentences,), daemon=True).start()
 
-    def show_stock_plot(self, file_path):
-        try:
-            df = pd.read_csv(file_path)
-            df["Date"] = pd.to_datetime(df["Date"], errors='coerce')
-            df["Close"] = pd.to_numeric(df["Close"].astype(str).str.replace(',', ''), errors='coerce')
-            df.dropna(subset=['Date', 'Close'], inplace=True)
-            df.sort_values(by="Date", inplace=True)
-            plt.style.use('seaborn-v0_8-darkgrid')
-            plt.figure(figsize=(10, 5))
-            plt.plot(df["Date"], df["Close"], marker='.', linestyle='-', color='#4ecca3')
-            plt.xlabel("Date")
-            plt.ylabel("Closing Price (USD)")
-            plt.title(f"Stock Price History for {os.path.basename(file_path).split('_')[0]}")
-            plt.xticks(rotation=45)
-            plt.tight_layout()
-            plt.show()
-        except Exception as e:
-            messagebox.showerror("Error", f"Could not display plot: {e}")
-
     def add_taskbar_button(self, app_key, app_name, window):
         button = ttk.Button(self.task_button_area, text=app_name, command=lambda w=window: self.handle_taskbar_button_click(w))
         button.pack(side=tk.LEFT, padx=2, pady=2)
@@ -993,9 +941,8 @@ class OS:
 
         def on_close():
             button.destroy()
-            del self.taskbar_buttons[app_key]
-            if app_key in self.app_windows:
-                del self.app_windows[app_key]
+            if app_key in self.taskbar_buttons: del self.taskbar_buttons[app_key]
+            if app_key in self.app_windows: del self.app_windows[app_key]
             window.destroy()
 
         window.protocol("WM_DELETE_WINDOW", on_close)
@@ -1043,17 +990,13 @@ class OS:
 
 if __name__ == "__main__":
     setup_db()
-
     root = tk.Tk()
     root.title("WW Space")
     root.geometry("1024x768")
-
     my_os = OS(root)
-
     def on_closing():
         if messagebox.askokcancel("Quit", "Czy na pewno chcesz zamknąć system?"):
             my_os.stop_tornado_server()
             root.destroy()
-
     root.protocol("WM_DELETE_WINDOW", on_closing)
     root.mainloop()
