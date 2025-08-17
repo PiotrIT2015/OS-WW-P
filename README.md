@@ -53,4 +53,6 @@ Project is created with:
 
 ![image alt](https://github.com/PiotrIT2015/OS-WW-P/blob/master/screenshot-2.jpeg?raw=true)
 
+![image alt](https://github.com/PiotrIT2015/OS-WW-P/blob/master/screenshot-3-pca.jpeg?raw=true)
+
 
