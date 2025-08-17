@@ -36,11 +36,17 @@ tools i.e.chatGPT . It is only a shortcut to run a file[*.jar] .
 
 ## Running
 
+**Microsoft Windows**
+
 1. `winget install Python.Python.3.10`(via cmd)
 2. add python to PATH
-3. `docker-compose up\down`
 3. double click on `install-require-libraries.bat`
 4. double click on `wwp.bat`
+
+**Linux**
+1. `docker-compose up\down`
+2. Apache: `http://localhost:8080`
+3. MySQL/phpMyAdmin; `http://localhost:8081`
 	
 ## Technologies
 Project is created with:
