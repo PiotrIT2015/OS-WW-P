@@ -1103,7 +1103,7 @@ class OS:
         try:
             asyncio.set_event_loop(asyncio.new_event_loop())
             app = tornado.web.Application([(r"/stock", StockSearchHandler), (r"/websearch", WebSearchHandler)])
-            app.listen(8889)
+            app.listen(8889, address="0.0.0.0")
             print("✅ Serwer Tornado działa na http://localhost:8889")
             tornado.ioloop.IOLoop.current().start()
         except OSError as e:
