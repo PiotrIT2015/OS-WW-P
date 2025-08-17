@@ -27,12 +27,13 @@ from collections import Counter
 import sys
 import asyncio
 import csv
-import shutil # DODANO: Potrzebne do usuwania katalogów
+import shutil
+import re # DODANO: Potrzebne do walidacji IP
+import random # DODANO: Potrzebne do generowania losowego IP
 
-# Usunięto importy GTK, które powodowały konflikt
-# import gi
-# gi.require_version("Gtk", "3.0")
-# from gi.repository import Gtk
+# DODANO: Stałe wyrażeń regularnych z [kod 2]
+IP_ADDRESS_RE = re.compile(r"^(?=.*[^\.]$)((25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.?){4}$")
+MASK_BINARY_RE = re.compile(r"^1*0*$")
 
 
 # --- Konfiguracja i funkcje pomocnicze ---
@@ -496,6 +497,10 @@ class OS:
         self.update_time()
         self.tornado_thread = None
         self.start_tornado_server()
+        # DODANO: Zmienne do przechowywania wyników obliczeń podsieci
+        self.network_addr_integer = None
+        self.broadcast_addr_integer = None
+
 
     def create_desktop(self):
         self.desktop = tk.Frame(self.root, bg=self.desktop_bg_color)
@@ -592,14 +597,13 @@ class OS:
             self.app_windows["settings"].lift()
 
     def open_pandas_analyzer(self):
-        # NAPRAWIONO: Zastąpiono GTK odpowiednikiem z Tkinter
         flista = filedialog.askopenfilenames(
             title="Wybierz 4 pliki do analizy",
             filetypes=[("ASC files", "*.asc"), ("All files", "*.*")]
         )
 
         if not flista:
-            return # Użytkownik anulował wybór
+            return
 
         if len(flista) != 4:
             messagebox.showerror("Błąd", f"Oczekiwano 4 plików, a wybrano {len(flista)}. Proszę spróbować ponownie.")
@@ -645,14 +649,13 @@ class OS:
             messagebox.showerror("Błąd przetwarzania", f"Wystąpił nieoczekiwany błąd podczas analizy plików:\n\n{e}")
 
     def open_pca_analyzer(self):
-        # NAPRAWIONO: Zastąpiono GTK odpowiednikiem z Tkinter
         flista = filedialog.askopenfilenames(
             title="Wybierz pliki do analizy PCA",
             filetypes=[("ASC files", "*.asc"), ("All files", "*.*")]
         )
 
         if not flista:
-            return # Użytkownik anulował
+            return
 
         n = len(flista)
         colA, colB = np.loadtxt(flista[0], usecols=(0, 1), unpack=True)
@@ -687,8 +690,7 @@ class OS:
         plt.xlabel("Liczba komponentów")
         plt.ylabel("Suma błędów")
         plt.show()
-        
-        # Wykres porównawczy dla 4 komponentów (można zmienić)
+
         num_components_to_plot = min(3, n-1)
         if num_components_to_plot >= 0:
             plt.plot(D, Drepp[:, :, num_components_to_plot], 'o', [0, 1.2], [0, 1.2], '-')
@@ -698,8 +700,6 @@ class OS:
             plt.show()
 
     def create_file_manager_widgets(self, parent):
-        # Ta funkcja była już poprawna, ale jest tutaj dla kompletności.
-        # DODANO poniżej brakujące metody, które są przez nią wywoływane.
         main_frame = Frame(parent)
         main_frame.pack(fill=tk.BOTH, expand=True)
 
@@ -726,7 +726,6 @@ class OS:
         
         self.refresh_file_tree()
 
-    # --- UZUPEŁNIENIE: BRAKUJĄCE METODY DO OBSŁUGI MENEDŻERA PLIKÓW ---
     def populate_file_tree(self, parent_path, parent_node):
         """Rekurencyjnie wypełnia Treeview strukturą plików i katalogów."""
         if not os.path.isdir(parent_path):
@@ -737,7 +736,6 @@ class OS:
             item_path = os.path.join(parent_path, item_name)
             node = self.file_manager_tree.insert(parent_node, 'end', text=item_name, open=False, values=[item_path])
             if os.path.isdir(item_path):
-                # Dodaj pusty element, aby można było rozwinąć folder, ale wypełniaj go dopiero na żądanie (optymalizacja)
                 self.file_manager_tree.insert(node, 'end', text='...')
 
     def refresh_file_tree(self):
@@ -745,7 +743,6 @@ class OS:
         if hasattr(self, 'file_manager_tree') and self.file_manager_tree.winfo_exists():
             for i in self.file_manager_tree.get_children():
                 self.file_manager_tree.delete(i)
-            # Wypełnia tylko najwyższy poziom, reszta dynamicznie
             self.populate_file_tree(os.getcwd(), "")
 
     def open_with_default_app(self, file_path):
@@ -811,7 +808,6 @@ class OS:
                 messagebox.showerror("Błąd", "Plik o tej nazwie już istnieje w tej lokalizacji.")
         except Exception as e:
             messagebox.showerror("Błąd", f"Nie można utworzyć pliku: {e}")
-    # --- KONIEC UZUPEŁNIONYCH METOD ---
 
     def create_settings_widgets(self, parent):
         notebook = ttk.Notebook(parent)
@@ -829,21 +825,119 @@ class OS:
         self.update_network_info()
         ttk.Label(pers_frame, text="Desktop Background:").grid(row=0, column=0, padx=5, pady=5, sticky=tk.W)
         ttk.Button(pers_frame, text="Choose Color", command=self.choose_background_color).grid(row=0, column=1, padx=5, pady=5, sticky=tk.W)
-		# Zakładka 3: Subnet Calculator
-        subnet_frame = ttk.Frame(notebook); notebook.add(subnet_frame, text="Subnet Calculator")
+
+        # POCZĄTEK SEKCJI SUBNET CALCULATOR (ZINTEGROWANO KOD)
+        subnet_frame = ttk.Frame(notebook)
+        notebook.add(subnet_frame, text="Subnet Calculator")
         ttk.Label(subnet_frame, text="IP Address:").grid(row=0, column=0, padx=5, pady=10, sticky=tk.W)
-        self.subnet_ip_entry = ttk.Entry(subnet_frame, width=30); self.subnet_ip_entry.grid(row=0, column=1, padx=5, pady=10, sticky=tk.W)
+        self.subnet_ip_entry = ttk.Entry(subnet_frame, width=30)
+        self.subnet_ip_entry.grid(row=0, column=1, padx=5, pady=10, sticky=tk.W)
         self.subnet_ip_entry.insert(0, "192.168.10.5")
         ttk.Label(subnet_frame, text="Subnet Mask:").grid(row=1, column=0, padx=5, pady=5, sticky=tk.W)
-        self.subnet_mask_entry = ttk.Entry(subnet_frame, width=30); self.subnet_mask_entry.grid(row=1, column=1, padx=5, pady=5, sticky=tk.W)
+        self.subnet_mask_entry = ttk.Entry(subnet_frame, width=30)
+        self.subnet_mask_entry.grid(row=1, column=1, padx=5, pady=5, sticky=tk.W)
         self.subnet_mask_entry.insert(0, "255.255.255.0")
         ttk.Button(subnet_frame, text="Calculate", command=self._calculate_subnet_gui).grid(row=2, column=0, columnspan=2, pady=10)
         self.subnet_results_text = scrolledtext.ScrolledText(subnet_frame, height=10, wrap=tk.WORD)
         self.subnet_results_text.grid(row=3, column=0, columnspan=2, padx=5, pady=5, sticky="ew")
-        random_frame = ttk.Frame(subnet_frame); random_frame.grid(row=4, column=0, columnspan=2, pady=10)
+        random_frame = ttk.Frame(subnet_frame)
+        random_frame.grid(row=4, column=0, columnspan=2, pady=10)
         ttk.Button(random_frame, text="Generate Random IP", command=self._generate_random_ip_gui).pack(side=tk.LEFT, padx=5)
         self.random_ip_label = ttk.Label(random_frame, text="<-- Click to generate", font=('Helvetica', 10, 'italic'))
         self.random_ip_label.pack(side=tk.LEFT, padx=5)
+        # KONIEC SEKCJI SUBNET CALCULATOR
+
+    # POCZĄTEK NOWYCH METOD Z [kod 2] ZINTEGROWANYCH Z KLASĄ OS
+    def _ip_address_valid(self, ip_addr):
+        """Sprawdza, czy podany ciąg jest prawidłowym adresem IP."""
+        return IP_ADDRESS_RE.match(ip_addr) is not None
+
+    def _mask_valid(self, mask):
+        """Sprawdza, czy podany ciąg jest prawidłową maską podsieci."""
+        if not self._ip_address_valid(mask):
+            return False
+        mask_binary = self._convert_ip_addr_decimal_to_binary(mask)
+        return MASK_BINARY_RE.match(mask_binary) is not None
+
+    def _convert_ip_addr_decimal_to_binary(self, ip_addr):
+        """Konwertuje adres IP w formacie dziesiętnym na ciąg binarny (32 bity)."""
+        return ''.join(['{0:08b}'.format(int(octet)) for octet in ip_addr.split('.')])
+
+    def _convert_ip_addr_int_to_human(self, ip_addr_int):
+        """Konwertuje 32-bitową liczbę całkowitą na adres IP w formacie dziesiętnym."""
+        ip_addr_bin = '{0:032b}'.format(ip_addr_int)
+        octets = [str(int(ip_addr_bin[i*8:(i+1)*8], 2)) for i in range(4)]
+        return '.'.join(octets)
+
+    def _calculate_subnet_gui(self):
+        """Pobiera dane z GUI, oblicza parametry podsieci i wyświetla wyniki."""
+        ip_addr = self.subnet_ip_entry.get()
+        mask = self.subnet_mask_entry.get()
+
+        self.subnet_results_text.delete('1.0', tk.END)
+        self.network_addr_integer = None # Resetuj poprzednie wyniki
+        self.broadcast_addr_integer = None
+
+        if not self._ip_address_valid(ip_addr):
+            self.subnet_results_text.insert(tk.END, "Błąd: Nieprawidłowy format adresu IP.")
+            return
+        if not self._mask_valid(mask):
+            self.subnet_results_text.insert(tk.END, "Błąd: Nieprawidłowy format maski podsieci.")
+            return
+
+        ip_addr_binary = self._convert_ip_addr_decimal_to_binary(ip_addr)
+        mask_binary = self._convert_ip_addr_decimal_to_binary(mask)
+        
+        mask_num_ones = mask_binary.count('1')
+        self.network_addr_integer = int(ip_addr_binary, 2) & int(mask_binary, 2)
+        network_addr_str = self._convert_ip_addr_int_to_human(self.network_addr_integer)
+
+        wildcard_integer = ~int(mask_binary, 2) & 0xffffffff
+        wildcard_str = self._convert_ip_addr_int_to_human(wildcard_integer)
+
+        self.broadcast_addr_integer = self.network_addr_integer | wildcard_integer
+        broadcast_addr_str = self._convert_ip_addr_int_to_human(self.broadcast_addr_integer)
+
+        if mask_num_ones == 32:
+            num_hosts = 1
+        elif mask_num_ones == 31:
+            num_hosts = 2
+        else:
+            num_hosts = 2**(32 - mask_num_ones) - 2
+
+        results = (
+            f"Adres IP:\t\t{ip_addr}\n"
+            f"Maska podsieci:\t{mask} (/{mask_num_ones})\n"
+            f"--------------------------------------------------\n"
+            f"Adres sieci:\t\t{network_addr_str}\n"
+            f"Adres rozgłoszeniowy:\t{broadcast_addr_str}\n"
+            f"Maska Wildcard:\t{wildcard_str}\n"
+            f"Liczba hostów:\t\t{num_hosts if num_hosts > 0 else 0}\n"
+        )
+        self.subnet_results_text.insert(tk.END, results)
+
+    def _generate_random_ip_gui(self):
+        """Generuje losowy adres IP z obliczonej podsieci."""
+        if self.network_addr_integer is None or self.broadcast_addr_integer is None:
+            messagebox.showwarning("Brak danych", "Najpierw oblicz parametry podsieci.")
+            return
+        
+        # Wyklucz adres sieci i rozgłoszeniowy dla masek < /31
+        mask_num_ones = self._convert_ip_addr_decimal_to_binary(self.subnet_mask_entry.get()).count('1')
+        if mask_num_ones < 31:
+             start_range = self.network_addr_integer + 1
+             end_range = self.broadcast_addr_integer - 1
+             if start_range > end_range:
+                 self.random_ip_label.config(text="Brak dostępnych hostów")
+                 return
+        else:
+             start_range = self.network_addr_integer
+             end_range = self.broadcast_addr_integer
+
+        random_ip_int = random.randint(start_range, end_range)
+        random_ip_str = self._convert_ip_addr_int_to_human(random_ip_int)
+        self.random_ip_label.config(text=random_ip_str)
+    # KONIEC NOWYCH METOD Z [kod 2]
 
     def create_white_dwarf_widgets(self, parent):
         input_frame = Frame(parent)
@@ -870,16 +964,21 @@ class OS:
     def update_network_info(self):
         def _get_info():
             try:
-                ip = socket.gethostbyname(socket.gethostname())
+                # Użyj tej metody, aby uzyskać IP, które może komunikować się na zewnątrz
+                s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+                s.connect(("8.8.8.8", 80))
+                ip = s.getsockname()[0]
+                s.close()
             except Exception:
-                ip = "Not Available"
+                ip = "Brak połączenia"
             try:
                 hostname = socket.gethostname()
             except Exception:
-                hostname = "Not Available"
+                hostname = "Nieznany"
             self.root.after(0, lambda: self.ip_display.config(text=ip))
             self.root.after(0, lambda: self.hostname_display.config(text=hostname))
         threading.Thread(target=_get_info, daemon=True).start()
+
 
     def choose_background_color(self):
         color_code = colorchooser.askcolor(title="Choose Background Color")[1]
