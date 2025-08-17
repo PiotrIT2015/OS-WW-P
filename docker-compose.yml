@@ -4,6 +4,8 @@ services:
     build: .
     container_name: os-ww-p
     restart: unless-stopped
+    ports:
+      - "8080:80"  # <--- DODANA SEKCJA
     volumes:
       - .:/app
     environment:
