@@ -42,7 +42,7 @@ tools i.e.chatGPT . It is only a shortcut to run a file[*.jar] .
 2. add python to PATH
 3. configure Apache and MySQL on XAMPP/Cloud
 4. double click on `install-require-libraries.bat`
-5. double click on `wwp.bat`
+5. double click on `run.bat`
 
 **Linux**
 
