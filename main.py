@@ -510,14 +510,50 @@ class OS:
         self.taskbar = tk.Frame(self.root, bg="gray", height=30)
         self.taskbar.pack(side=tk.BOTTOM, fill=tk.X)
         self.taskbar.pack_propagate(False)
-        self.start_menu_button = tk.Menubutton(self.taskbar, text="🚀", relief=tk.RAISED, borderwidth=2, bg="lightgray", font=("Segoe UI Emoji", 10))
+
+        # ZMIANA: Użycie tk.Button i przypisanie komendy do nowej funkcji
+        try:
+            icon_path = os.path.join(os.getcwd(), "img", "sys", "sheild.jpeg")
+            image = Image.open(icon_path).resize((22, 22), Image.Resampling.LANCZOS)
+            self.start_icon_photo = ImageTk.PhotoImage(image)
+            # Zmieniono Menubutton na Button i dodano 'command'
+            self.start_menu_button = tk.Button(self.taskbar, image=self.start_icon_photo, relief=tk.RAISED, borderwidth=2, command=self.show_start_menu)
+            self.start_menu_button.image = self.start_icon_photo
+        except FileNotFoundError:
+            print("Ostrzeżenie: Nie znaleziono ikony 'sheild.jpeg'. Używam domyślnego tekstu.")
+            # Zmieniono Menubutton na Button i dodano 'command'
+            self.start_menu_button = tk.Button(self.taskbar, text="🛡️", relief=tk.RAISED, borderwidth=2, bg="lightgray", font=("Segoe UI Emoji", 10), command=self.show_start_menu)
+
         self.start_menu_button.pack(side=tk.LEFT, padx=5, pady=2)
-        self.start_menu = tk.Menu(self.start_menu_button, tearoff=0)
-        self.start_menu_button["menu"] = self.start_menu
+        # Zmieniono rodzica menu na 'self.root', aby nie był przywiązany do przycisku
+        self.start_menu = tk.Menu(self.root, tearoff=0)
+        
         self.task_button_area = tk.Frame(self.taskbar, bg="gray")
         self.task_button_area.pack(side=tk.LEFT, fill=tk.X, expand=True)
         self.time_label = tk.Label(self.taskbar, text="", bg="gray", fg="white")
         self.time_label.pack(side=tk.RIGHT, padx=5, pady=2)
+
+    def show_start_menu(self):
+        """Oblicza pozycję i wyświetla menu startowe nad przyciskiem."""
+        # Wymuszenie aktualizacji geometrii, aby uzyskać prawidłowe wymiary menu
+        self.root.update_idletasks()
+
+        # Pobranie współrzędnych przycisku start
+        x = self.start_menu_button.winfo_rootx()
+        y = self.start_menu_button.winfo_rooty()
+
+        # Obliczenie wysokości menu
+        menu_height = self.start_menu.winfo_reqheight()
+        
+        # Ustawienie pozycji Y tak, aby menu pojawiło się nad przyciskiem
+        popup_y = y - menu_height
+
+        try:
+            # Wyświetlenie menu pod podanymi współrzędnymi
+            self.start_menu.tk_popup(x, popup_y)
+        finally:
+            # Zwolnienie "grab" - ważne dla poprawnego działania
+            self.start_menu.grab_release()
 
     def update_time(self):
         self.time_label.config(text=datetime.now().strftime("%H:%M:%S"))
@@ -549,6 +585,16 @@ class OS:
                 self.start_menu.add_command(label=icon_data["name"], command=icon_data["action"])
             except Exception as e:
                 print(f"Błąd podczas tworzenia ikony '{icon_data['name']}': {e}")
+        
+        # DODANO: Dodaj separator i opcję zamknięcia na końcu menu start
+        self.start_menu.add_separator()
+        self.start_menu.add_command(label="Zamknij", command=self.shutdown)
+
+    def shutdown(self):
+        """Obsługuje sekwencję zamykania aplikacji."""
+        if messagebox.askokcancel("Zamknij", "Czy na pewno chcesz zamknąć system?"):
+            self.stop_tornado_server()
+            self.root.destroy()
 
     def open_white_dwarf_shodan(self):
         try:
@@ -1090,12 +1136,14 @@ class OS:
 if __name__ == "__main__":
     setup_db()
     root = tk.Tk()
-    root.title("WW Space")
+    root.title("SecureOS")
+
+    # ZMIANA: Usunięto blok kodu ustawiający ikonę okna, aby przywrócić domyślną.
+    
     root.geometry("1024x768")
     my_os = OS(root)
-    def on_closing():
-        if messagebox.askokcancel("Quit", "Czy na pewno chcesz zamknąć system?"):
-            my_os.stop_tornado_server()
-            root.destroy()
-    root.protocol("WM_DELETE_WINDOW", on_closing)
+    
+    # Przekierowanie domyślnej akcji zamknięcia do metody w klasie OS
+    root.protocol("WM_DELETE_WINDOW", my_os.shutdown)
+    
     root.mainloop()
