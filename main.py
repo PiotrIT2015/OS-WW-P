@@ -17,6 +17,8 @@ import json
 import requests
 import pandas as pd
 import matplotlib.pyplot as plt
+from matplotlib.figure import Figure
+from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 from bs4 import BeautifulSoup
 import mysql.connector
 from textblob import TextBlob
@@ -28,10 +30,11 @@ import sys
 import asyncio
 import csv
 import shutil
-import re # DODANO: Potrzebne do walidacji IP
-import random # DODANO: Potrzebne do generowania losowego IP
+import re
+import random
+import nmap # DODANO: Import dla skanera Nmap
 
-# DODANO: Stałe wyrażeń regularnych z [kod 2]
+# Stałe wyrażeń regularnych z [kod 2]
 IP_ADDRESS_RE = re.compile(r"^(?=.*[^\.]$)((25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.?){4}$")
 MASK_BINARY_RE = re.compile(r"^1*0*$")
 
@@ -439,8 +442,6 @@ class ImageViewerApp:
         elif self.is_text_file(file_path):
             self.show_text_content(file_path)
         else:
-            # Ta metoda jest teraz częścią klasy OS, więc trzeba ją wywołać inaczej
-            # Zakładając, że root ma referencję do instancji OS
             if hasattr(self.root, 'my_os'):
                 self.root.my_os.open_with_default_app(file_path)
 
@@ -484,7 +485,7 @@ class ImageViewerApp:
 class OS:
     def __init__(self, root):
         self.root = root
-        self.root.my_os = self # Dodanie referencji do instancji OS w głównym oknie
+        self.root.my_os = self
         self.processes = {}
         self.filesystem = FileSystem()
         self.scheduler = Scheduler()
@@ -497,10 +498,8 @@ class OS:
         self.update_time()
         self.tornado_thread = None
         self.start_tornado_server()
-        # DODANO: Zmienne do przechowywania wyników obliczeń podsieci
         self.network_addr_integer = None
         self.broadcast_addr_integer = None
-
 
     def create_desktop(self):
         self.desktop = tk.Frame(self.root, bg=self.desktop_bg_color)
@@ -511,21 +510,17 @@ class OS:
         self.taskbar.pack(side=tk.BOTTOM, fill=tk.X)
         self.taskbar.pack_propagate(False)
 
-        # ZMIANA: Użycie tk.Button i przypisanie komendy do nowej funkcji
         try:
             icon_path = os.path.join(os.getcwd(), "img", "sys", "sheild.jpeg")
             image = Image.open(icon_path).resize((22, 22), Image.Resampling.LANCZOS)
             self.start_icon_photo = ImageTk.PhotoImage(image)
-            # Zmieniono Menubutton na Button i dodano 'command'
             self.start_menu_button = tk.Button(self.taskbar, image=self.start_icon_photo, relief=tk.RAISED, borderwidth=2, command=self.show_start_menu)
             self.start_menu_button.image = self.start_icon_photo
         except FileNotFoundError:
             print("Ostrzeżenie: Nie znaleziono ikony 'sheild.jpeg'. Używam domyślnego tekstu.")
-            # Zmieniono Menubutton na Button i dodano 'command'
             self.start_menu_button = tk.Button(self.taskbar, text="🛡️", relief=tk.RAISED, borderwidth=2, bg="lightgray", font=("Segoe UI Emoji", 10), command=self.show_start_menu)
 
         self.start_menu_button.pack(side=tk.LEFT, padx=5, pady=2)
-        # Zmieniono rodzica menu na 'self.root', aby nie był przywiązany do przycisku
         self.start_menu = tk.Menu(self.root, tearoff=0)
         
         self.task_button_area = tk.Frame(self.taskbar, bg="gray")
@@ -534,25 +529,14 @@ class OS:
         self.time_label.pack(side=tk.RIGHT, padx=5, pady=2)
 
     def show_start_menu(self):
-        """Oblicza pozycję i wyświetla menu startowe nad przyciskiem."""
-        # Wymuszenie aktualizacji geometrii, aby uzyskać prawidłowe wymiary menu
         self.root.update_idletasks()
-
-        # Pobranie współrzędnych przycisku start
         x = self.start_menu_button.winfo_rootx()
         y = self.start_menu_button.winfo_rooty()
-
-        # Obliczenie wysokości menu
         menu_height = self.start_menu.winfo_reqheight()
-        
-        # Ustawienie pozycji Y tak, aby menu pojawiło się nad przyciskiem
         popup_y = y - menu_height
-
         try:
-            # Wyświetlenie menu pod podanymi współrzędnymi
             self.start_menu.tk_popup(x, popup_y)
         finally:
-            # Zwolnienie "grab" - ważne dla poprawnego działania
             self.start_menu.grab_release()
 
     def update_time(self):
@@ -568,7 +552,9 @@ class OS:
             {"name": "PCA Analyzer", "icon": "chart_icon.png", "action": self.open_pca_analyzer},
             {"name": "White Dwarf Search", "icon": "browser.png", "action": lambda: open_white_dwarf(self)},
             {"name": "WhiteDwarf Shodan", "icon": "browser.png", "action": self.open_white_dwarf_shodan},
-            {"name": "Network Monitor", "icon": "programming.png", "action": self.launch_java_app},
+            {"name": "Network Monitor", "icon": "network_monitor.png", "action": self.launch_java_app},
+            # DODANO NOWĄ APLIKACJĘ NMAP
+            {"name": "Nmap Scanner", "icon": "network_scanner.png", "action": self.open_nmap_scanner},
             {"name": "WitchCraft (Web)", "icon": "musical-note.png", "action": self.open_yii_app},
             {"name": "Settings", "icon": "settings_icon.png", "action": self.open_settings},
         ]
@@ -586,12 +572,10 @@ class OS:
             except Exception as e:
                 print(f"Błąd podczas tworzenia ikony '{icon_data['name']}': {e}")
         
-        # DODANO: Dodaj separator i opcję zamknięcia na końcu menu start
         self.start_menu.add_separator()
         self.start_menu.add_command(label="Zamknij", command=self.shutdown)
 
     def shutdown(self):
-        """Obsługuje sekwencję zamykania aplikacji."""
         if messagebox.askokcancel("Zamknij", "Czy na pewno chcesz zamknąć system?"):
             self.stop_tornado_server()
             self.root.destroy()
@@ -631,6 +615,168 @@ class OS:
             self.add_taskbar_button("file_manager", "📁 Explorer", win)
         else:
             self.app_windows["file_manager"].lift()
+    
+    # POCZĄTEK: NOWE METODY DLA APLIKACJI NMAP SCANNER
+    def open_nmap_scanner(self):
+        """Otwiera aplikację Nmap Banner Scanner."""
+        if "nmap_scanner" not in self.app_windows or not self.app_windows["nmap_scanner"].winfo_exists():
+            win = tk.Toplevel(self.root)
+            win.title("Nmap Banner Scanner")
+            win.geometry("800x600")
+            self.app_windows["nmap_scanner"] = win
+            self.create_nmap_scanner_widgets(win)
+            self.add_taskbar_button("nmap_scanner", "📡 Nmap Scan", win)
+        else:
+            self.app_windows["nmap_scanner"].lift()
+
+    def create_nmap_scanner_widgets(self, parent):
+        """Tworzy widżety dla aplikacji Nmap."""
+        # --- Ramka na pola wejściowe ---
+        input_frame = ttk.Frame(parent, padding="10")
+        input_frame.pack(fill=tk.X)
+
+        ttk.Label(input_frame, text="Host:").pack(side=tk.LEFT, padx=(0, 5))
+        self.nmap_host_entry = ttk.Entry(input_frame, width=20)
+        self.nmap_host_entry.insert(0, "127.0.0.1")
+        self.nmap_host_entry.pack(side=tk.LEFT, expand=True, fill=tk.X, padx=5)
+
+        ttk.Label(input_frame, text="First Port:").pack(side=tk.LEFT, padx=5)
+        self.nmap_start_port_entry = ttk.Entry(input_frame, width=8)
+        self.nmap_start_port_entry.insert(0, "1")
+        self.nmap_start_port_entry.pack(side=tk.LEFT, padx=5)
+
+        ttk.Label(input_frame, text="Last Port:").pack(side=tk.LEFT, padx=5)
+        self.nmap_end_port_entry = ttk.Entry(input_frame, width=8)
+        self.nmap_end_port_entry.insert(0, "1024")
+        self.nmap_end_port_entry.pack(side=tk.LEFT, padx=5)
+        
+        self.nmap_run_button = ttk.Button(input_frame, text="Run Scan", command=self._run_nmap_scan_thread)
+        self.nmap_run_button.pack(side=tk.LEFT, padx=(10, 0))
+
+        # --- Ramka główna na wyniki i wykres ---
+        main_results_frame = ttk.Frame(parent, padding="5")
+        main_results_frame.pack(fill=tk.BOTH, expand=True)
+
+        # --- Pole tekstowe na wyniki ---
+        self.nmap_output_text = scrolledtext.ScrolledText(main_results_frame, height=10, wrap=tk.WORD)
+        self.nmap_output_text.pack(fill=tk.BOTH, expand=True, pady=(0, 5))
+
+        # --- Wykres Matplotlib ---
+        self.nmap_fig = Figure(figsize=(5, 3), dpi=100)
+        self.nmap_plot = self.nmap_fig.add_subplot(111)
+        
+        self.nmap_canvas = FigureCanvasTkAgg(self.nmap_fig, master=main_results_frame)
+        self.nmap_canvas.get_tk_widget().pack(side=tk.TOP, fill=tk.BOTH, expand=True)
+        self.nmap_canvas.draw()
+
+    def _run_nmap_scan_thread(self):
+        """Uruchamia skanowanie Nmap w osobnym wątku, aby nie blokować GUI."""
+        host = self.nmap_host_entry.get()
+        try:
+            p_start = int(self.nmap_start_port_entry.get())
+            p_end = int(self.nmap_end_port_entry.get())
+        except ValueError:
+            messagebox.showerror("Błąd", "Porty muszą być liczbami całkowitymi.")
+            return
+
+        if not host:
+            messagebox.showerror("Błąd", "Nazwa hosta nie może być pusta.")
+            return
+
+        # Zablokuj przycisk i wyczyść poprzednie wyniki
+        self.nmap_run_button.config(state=tk.DISABLED)
+        self.nmap_output_text.delete('1.0', tk.END)
+        self.nmap_output_text.insert('1.0', f"Skanowanie {host} na portach {p_start}-{p_end}...\nTo może potrwać dłuższą chwilę.")
+        self.nmap_plot.clear()
+        self.nmap_canvas.draw()
+
+        # Uruchomienie skanowania w wątku
+        scan_thread = threading.Thread(
+            target=self._perform_nmap_scan,
+            args=(host, p_start, p_end),
+            daemon=True
+        )
+        scan_thread.start()
+
+    def _perform_nmap_scan(self, host, p_start, p_end):
+        """Logika skanowania Nmap (wykonywana w wątku)."""
+        try:
+            nm = nmap.PortScanner()
+            port_range = f"{p_start}-{p_end}"
+            
+            # Ta funkcja jest blokująca, dlatego jest w wątku
+            nm.scan(
+                hosts=host,
+                ports=port_range,
+                arguments="-sV --script banner --host-timeout 15m --max-retries 2",
+            )
+            
+            # Przygotowanie wyników
+            open_ports, banner_sizes = [], []
+            result_string = ""
+
+            if host not in nm.all_hosts():
+                result_string = f"Host {host} nie odpowiada lub jest niedostępny."
+                self.root.after(0, self._update_nmap_gui, result_string, [], [])
+                return
+
+            for proto in nm[host].all_protocols():
+                for port in sorted(nm[host][proto].keys()):
+                    state = nm[host][proto][port]["state"]
+                    if state != "open":
+                        continue
+
+                    service = nm[host][proto][port].get("name", "?")
+                    product = nm[host][proto][port].get("product", "")
+                    version = nm[host][proto][port].get("version", "")
+                    extrainfo = nm[host][proto][port].get("extrainfo", "")
+                    scripts = nm[host][proto][port].get("script", {})
+                    banner = scripts.get("banner", "").strip().replace('\n', ' ').replace('\r', '')
+
+                    line1 = f"TCP {port:>5} | {service:<10} | {' '.join(filter(None, [product, version, extrainfo]))}\n"
+                    result_string += line1
+                    if banner:
+                        line2 = f"           banner: {banner}\n"
+                        result_string += line2
+                    
+                    open_ports.append(port)
+                    banner_sizes.append(len(banner.encode()))
+            
+            if not open_ports:
+                result_string += "\nBrak otwartych portów lub bannerów w podanym zakresie."
+
+            # Aktualizacja GUI z wątku za pomocą 'after'
+            self.root.after(0, self._update_nmap_gui, result_string, open_ports, banner_sizes)
+
+        except nmap.nmap.PortScannerError as e:
+            error_msg = f"Błąd Nmap: {e}\n\nSprawdź, czy Nmap jest zainstalowany i dostępny w ścieżce systemowej."
+            self.root.after(0, self._update_nmap_gui, error_msg, [], [])
+        except Exception as e:
+            error_msg = f"Wystąpił nieoczekiwany błąd: {e}"
+            self.root.after(0, self._update_nmap_gui, error_msg, [], [])
+
+    def _update_nmap_gui(self, result_text, open_ports, banner_sizes):
+        """Aktualizuje interfejs użytkownika Nmap Scanner po zakończeniu skanowania."""
+        # Aktualizacja pola tekstowego
+        self.nmap_output_text.delete('1.0', tk.END)
+        self.nmap_output_text.insert('1.0', result_text)
+
+        # Aktualizacja wykresu
+        self.nmap_plot.clear()
+        if open_ports:
+            host = self.nmap_host_entry.get()
+            self.nmap_plot.plot(open_ports, banner_sizes, marker="o")
+            self.nmap_plot.set_title(f"Rozmiar bannerów dla {host}")
+            self.nmap_plot.set_xlabel("Port")
+            self.nmap_plot.set_ylabel("Długość bannera (B)")
+            self.nmap_plot.grid(True)
+            self.nmap_fig.tight_layout()
+        
+        self.nmap_canvas.draw()
+        
+        # Odblokuj przycisk
+        self.nmap_run_button.config(state=tk.NORMAL)
+    # KONIEC: NOWE METODY DLA APLIKACJI NMAP SCANNER
 
     def open_settings(self):
         if "settings" not in self.app_windows or not self.app_windows["settings"].winfo_exists():
@@ -777,12 +923,16 @@ class OS:
         if not os.path.isdir(parent_path):
             return
         
-        items = sorted(os.listdir(parent_path), key=lambda x: not os.path.isdir(os.path.join(parent_path, x)))
-        for item_name in items:
-            item_path = os.path.join(parent_path, item_name)
-            node = self.file_manager_tree.insert(parent_node, 'end', text=item_name, open=False, values=[item_path])
-            if os.path.isdir(item_path):
-                self.file_manager_tree.insert(node, 'end', text='...')
+        try:
+            items = sorted(os.listdir(parent_path), key=lambda x: not os.path.isdir(os.path.join(parent_path, x)))
+            for item_name in items:
+                item_path = os.path.join(parent_path, item_name)
+                node = self.file_manager_tree.insert(parent_node, 'end', text=item_name, open=False, values=[item_path])
+                if os.path.isdir(item_path):
+                    self.file_manager_tree.insert(node, 'end', text='...')
+        except PermissionError:
+            self.file_manager_tree.insert(parent_node, 'end', text='[Dostęp zabroniony]', open=False)
+
 
     def refresh_file_tree(self):
         """Czyści i ponownie wypełnia drzewo plików."""
@@ -872,7 +1022,6 @@ class OS:
         ttk.Label(pers_frame, text="Desktop Background:").grid(row=0, column=0, padx=5, pady=5, sticky=tk.W)
         ttk.Button(pers_frame, text="Choose Color", command=self.choose_background_color).grid(row=0, column=1, padx=5, pady=5, sticky=tk.W)
 
-        # POCZĄTEK SEKCJI SUBNET CALCULATOR (ZINTEGROWANO KOD)
         subnet_frame = ttk.Frame(notebook)
         notebook.add(subnet_frame, text="Subnet Calculator")
         ttk.Label(subnet_frame, text="IP Address:").grid(row=0, column=0, padx=5, pady=10, sticky=tk.W)
@@ -891,37 +1040,30 @@ class OS:
         ttk.Button(random_frame, text="Generate Random IP", command=self._generate_random_ip_gui).pack(side=tk.LEFT, padx=5)
         self.random_ip_label = ttk.Label(random_frame, text="<-- Click to generate", font=('Helvetica', 10, 'italic'))
         self.random_ip_label.pack(side=tk.LEFT, padx=5)
-        # KONIEC SEKCJI SUBNET CALCULATOR
 
-    # POCZĄTEK NOWYCH METOD Z [kod 2] ZINTEGROWANYCH Z KLASĄ OS
     def _ip_address_valid(self, ip_addr):
-        """Sprawdza, czy podany ciąg jest prawidłowym adresem IP."""
         return IP_ADDRESS_RE.match(ip_addr) is not None
 
     def _mask_valid(self, mask):
-        """Sprawdza, czy podany ciąg jest prawidłową maską podsieci."""
         if not self._ip_address_valid(mask):
             return False
         mask_binary = self._convert_ip_addr_decimal_to_binary(mask)
         return MASK_BINARY_RE.match(mask_binary) is not None
 
     def _convert_ip_addr_decimal_to_binary(self, ip_addr):
-        """Konwertuje adres IP w formacie dziesiętnym na ciąg binarny (32 bity)."""
         return ''.join(['{0:08b}'.format(int(octet)) for octet in ip_addr.split('.')])
 
     def _convert_ip_addr_int_to_human(self, ip_addr_int):
-        """Konwertuje 32-bitową liczbę całkowitą na adres IP w formacie dziesiętnym."""
         ip_addr_bin = '{0:032b}'.format(ip_addr_int)
         octets = [str(int(ip_addr_bin[i*8:(i+1)*8], 2)) for i in range(4)]
         return '.'.join(octets)
 
     def _calculate_subnet_gui(self):
-        """Pobiera dane z GUI, oblicza parametry podsieci i wyświetla wyniki."""
         ip_addr = self.subnet_ip_entry.get()
         mask = self.subnet_mask_entry.get()
 
         self.subnet_results_text.delete('1.0', tk.END)
-        self.network_addr_integer = None # Resetuj poprzednie wyniki
+        self.network_addr_integer = None
         self.broadcast_addr_integer = None
 
         if not self._ip_address_valid(ip_addr):
@@ -963,12 +1105,10 @@ class OS:
         self.subnet_results_text.insert(tk.END, results)
 
     def _generate_random_ip_gui(self):
-        """Generuje losowy adres IP z obliczonej podsieci."""
         if self.network_addr_integer is None or self.broadcast_addr_integer is None:
             messagebox.showwarning("Brak danych", "Najpierw oblicz parametry podsieci.")
             return
         
-        # Wyklucz adres sieci i rozgłoszeniowy dla masek < /31
         mask_num_ones = self._convert_ip_addr_decimal_to_binary(self.subnet_mask_entry.get()).count('1')
         if mask_num_ones < 31:
              start_range = self.network_addr_integer + 1
@@ -983,7 +1123,6 @@ class OS:
         random_ip_int = random.randint(start_range, end_range)
         random_ip_str = self._convert_ip_addr_int_to_human(random_ip_int)
         self.random_ip_label.config(text=random_ip_str)
-    # KONIEC NOWYCH METOD Z [kod 2]
 
     def create_white_dwarf_widgets(self, parent):
         input_frame = Frame(parent)
@@ -1010,7 +1149,6 @@ class OS:
     def update_network_info(self):
         def _get_info():
             try:
-                # Użyj tej metody, aby uzyskać IP, które może komunikować się na zewnątrz
                 s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
                 s.connect(("8.8.8.8", 80))
                 ip = s.getsockname()[0]
@@ -1137,13 +1275,10 @@ if __name__ == "__main__":
     setup_db()
     root = tk.Tk()
     root.title("SecureOS")
-
-    # ZMIANA: Usunięto blok kodu ustawiający ikonę okna, aby przywrócić domyślną.
-    
     root.geometry("1024x768")
+    
     my_os = OS(root)
     
-    # Przekierowanie domyślnej akcji zamknięcia do metody w klasie OS
     root.protocol("WM_DELETE_WINDOW", my_os.shutdown)
     
     root.mainloop()
