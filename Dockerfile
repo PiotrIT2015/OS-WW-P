@@ -1,3 +1,10 @@
+# Dockerfile
+
+# Autor: [Piotr Próchnicki]
+# Email: [piotr.prochnicki@gmail.com]
+# GitHub: [https:///www.github.com/PiotrIT2015]
+# Opis: Plik Dockerfile do budowy obrazu dla aplikacji Python.
+
 # Krok 1: Użyj oficjalnego, lekkiego obrazu Pythona jako obrazu bazowego.
 FROM python:3.11-slim-buster
 
