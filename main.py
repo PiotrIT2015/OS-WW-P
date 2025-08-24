@@ -181,18 +181,6 @@ def CompareTotal(data1, data2):
 def SaveFile(data, path):
     data.to_csv(path)
 
-def open_white_dwarf(self):
-    """Otwiera aplikację White Dwarf Web Searcher."""
-    if "white_dwarf" not in self.app_windows or not self.app_windows["white_dwarf"].winfo_exists():
-        win = tk.Toplevel(self.root)
-        win.title("White Dwarf Web Searcher")
-        win.geometry("700x500")
-        self.app_windows["white_dwarf"] = win
-        self.create_white_dwarf_widgets(win)
-        self.add_taskbar_button("white_dwarf", "🔎 Web Search", win)
-    else:
-        self.app_windows["white_dwarf"].lift()
-
 
 # --- Backend Tornado API ---
 class StockSearchHandler(tornado.web.RequestHandler):
@@ -553,11 +541,10 @@ class OS:
             {"name": "File Explorer", "icon": "folder_icon.png", "action": self.open_file_manager},
             {"name": "Pandas Analyzer", "icon": "chart_icon.png", "action": self.open_pandas_analyzer},
             {"name": "PCA Analyzer", "icon": "chart_icon.png", "action": self.open_pca_analyzer},
-            {"name": "White Dwarf Search", "icon": "browser.png", "action": lambda: open_white_dwarf(self)},
             # ### NOWY KOD ###
-            {"name": "Engine++ Crawler", "icon": "browser.png", "action": self.open_enginepp_crawler},
+            {"name": "Web Explorer", "icon": "browser.png", "action": self.open_web_explorer},
             # ### KONIEC NOWEGO KODU ###
-            {"name": "WhiteDwarf Shodan", "icon": "browser.png", "action": self.open_white_dwarf_shodan},
+            {"name": "Shodan - shortcut", "icon": "browser.png", "action": self.open_white_dwarf_shodan},
             {"name": "Network Monitor", "icon": "network_monitor.png", "action": self.launch_java_app},
             {"name": "Nmap Scanner", "icon": "network_scanner.png", "action": self.open_nmap_scanner},
             {"name": "WitchCraft (Web)", "icon": "musical-note.png", "action": self.open_yii_app},
@@ -620,24 +607,39 @@ class OS:
             self.add_taskbar_button("file_manager", "📁 Explorer", win)
         else:
             self.app_windows["file_manager"].lift()
-    
-    # ### NOWY KOD: POCZĄTEK METOD DLA APLIKACJI ENGINE++ CRAWLER ###
-    def open_enginepp_crawler(self):
-        """Otwiera aplikację Engine++ Crawler."""
-        if "enginepp_crawler" not in self.app_windows or not self.app_windows["enginepp_crawler"].winfo_exists():
-            win = tk.Toplevel(self.root)
-            win.title("Engine++ Crawler")
-            win.geometry("700x550")
-            self.app_windows["enginepp_crawler"] = win
-            self.create_enginepp_crawler_widgets(win)
-            self.add_taskbar_button("enginepp_crawler", "🕷️ Crawler", win)
-        else:
-            self.app_windows["enginepp_crawler"].lift()
 
+    # ### NOWY KOD: POCZĄTEK METODY DLA POŁĄCZONEJ APLIKACJI ###
+    def open_web_explorer(self):
+        """Otwiera aplikację Web Explorer z zakładkami do wyszukiwania i crawlowania."""
+        app_key = "web_explorer"
+        if app_key not in self.app_windows or not self.app_windows[app_key].winfo_exists():
+            win = tk.Toplevel(self.root)
+            win.title("Web Explorer")
+            win.geometry("800x600")
+            self.app_windows[app_key] = win
+
+            notebook = ttk.Notebook(win)
+            notebook.pack(fill="both", expand=True, padx=5, pady=5)
+
+            # Zakładka Web Search
+            search_frame = ttk.Frame(notebook, padding="10")
+            notebook.add(search_frame, text="White Dwarf Search")
+            self.create_white_dwarf_widgets(search_frame)
+
+            # Zakładka Website Crawler
+            crawler_frame = ttk.Frame(notebook, padding="10")
+            notebook.add(crawler_frame, text="Website Crawler")
+            self.create_enginepp_crawler_widgets(crawler_frame)
+
+            self.add_taskbar_button(app_key, "🌐 Web Explorer", win)
+        else:
+            self.app_windows[app_key].lift()
+    # ### KONIEC NOWEGO KODU ###
+    
     def create_enginepp_crawler_widgets(self, parent):
         """Tworzy widżety dla aplikacji Engine++ Crawler."""
-        input_frame = ttk.Frame(parent, padding="10")
-        input_frame.pack(fill=tk.X)
+        input_frame = ttk.Frame(parent)
+        input_frame.pack(fill=tk.X, pady=(0, 10))
 
         ttk.Label(input_frame, text="Start URL:").pack(side=tk.LEFT, padx=(0, 5))
         self.crawler_url_entry = ttk.Entry(input_frame, width=40)
@@ -647,11 +649,11 @@ class OS:
         self.crawler_run_button = ttk.Button(input_frame, text="Start Crawl", command=self._run_crawl_thread)
         self.crawler_run_button.pack(side=tk.LEFT, padx=(10, 0))
 
-        results_frame = ttk.Frame(parent, padding="5")
+        results_frame = ttk.Frame(parent)
         results_frame.pack(fill=tk.BOTH, expand=True)
 
         self.crawler_status_label = ttk.Label(results_frame, text="Gotowy.", font=("Helvetica", 10))
-        self.crawler_status_label.pack(side=tk.BOTTOM, fill=tk.X)
+        self.crawler_status_label.pack(side=tk.BOTTOM, fill=tk.X, pady=(5,0))
 
         self.crawler_results_text = scrolledtext.ScrolledText(results_frame, wrap=tk.WORD, state=tk.DISABLED)
         self.crawler_results_text.pack(fill=tk.BOTH, expand=True)
@@ -721,7 +723,6 @@ class OS:
 
         self.crawler_results_text.config(state=tk.DISABLED)
         self.crawler_run_button.config(state=tk.NORMAL)
-    # ### KONIEC NOWEGO KODU ###
 
     def open_nmap_scanner(self):
         """Otwiera aplikację Nmap Banner Scanner."""
@@ -1129,25 +1130,28 @@ class OS:
 
     def create_white_dwarf_widgets(self, parent):
         input_frame = Frame(parent)
-        input_frame.pack(fill=tk.X, padx=10, pady=5)
+        input_frame.pack(fill=tk.X, pady=5)
         tk.Label(input_frame, text="Adres URL:").pack(side=tk.LEFT)
         self.dwarf_url_entry = tk.Entry(input_frame)
         self.dwarf_url_entry.pack(side=tk.LEFT, fill=tk.X, expand=True, padx=5)
         self.dwarf_url_entry.insert(0, "https://www.reuters.com/technology/")
+        
         query_frame = Frame(parent)
-        query_frame.pack(fill=tk.X, padx=10, pady=5)
+        query_frame.pack(fill=tk.X, pady=5)
         tk.Label(query_frame, text="Szukana fraza:").pack(side=tk.LEFT)
         self.dwarf_query_entry = tk.Entry(query_frame)
         self.dwarf_query_entry.pack(side=tk.LEFT, fill=tk.X, expand=True, padx=5)
         self.dwarf_query_entry.insert(0, "AI")
+        
         action_frame = Frame(parent)
-        action_frame.pack(fill=tk.X, padx=10, pady=5)
+        action_frame.pack(fill=tk.X, pady=5)
         Button(action_frame, text="Szukaj", command=self._perform_web_search).pack(side=tk.LEFT)
         self.dwarf_sentiment_label = tk.Label(action_frame, text="Sentyment: -", font=("Arial", 12, "bold"))
         self.dwarf_sentiment_label.pack(side=tk.LEFT, padx=20)
         Button(action_frame, text="Analiza PCA", command=self._run_pca_on_results).pack(side=tk.LEFT, padx=10)
+        
         self.dwarf_result_box = scrolledtext.ScrolledText(parent, width=80, height=20)
-        self.dwarf_result_box.pack(padx=10, pady=10, fill="both", expand=True)
+        self.dwarf_result_box.pack(pady=10, fill="both", expand=True)
 
     def update_network_info(self):
         def _get_info():
@@ -1189,20 +1193,26 @@ class OS:
             response = requests.post(server_url, json={"url": url, "query": query}, timeout=20)
             response.raise_for_status()
             data = response.json()
-            self.dwarf_result_box.delete(1.0, tk.END)
-            self.dwarf_result_box.insert(tk.END, data.get("results", "Brak wyników w odpowiedzi."))
-            self.dwarf_sentiment_label.config(text=f"Sentyment: {data.get('sentiment', '-')}")
+            self.root.after(0, self._update_search_gui, data)
         except requests.exceptions.RequestException as e:
             messagebox.showerror("Błąd Połączenia", f"Nie można połączyć się z serwerem: {e}")
-            self.dwarf_result_box.delete(1.0, tk.END)
-            self.dwarf_sentiment_label.config(text="Sentyment: -")
+            self.root.after(0, self._reset_search_gui)
         except Exception as e:
             messagebox.showerror("Błąd Aplikacji", f"Wystąpił nieoczekiwany błąd: {e}")
-            self.dwarf_result_box.delete(1.0, tk.END)
-            self.dwarf_sentiment_label.config(text="Sentyment: -")
+            self.root.after(0, self._reset_search_gui)
+
+    def _update_search_gui(self, data):
+        self.dwarf_result_box.delete(1.0, tk.END)
+        self.dwarf_result_box.insert(tk.END, data.get("results", "Brak wyników w odpowiedzi."))
+        self.dwarf_sentiment_label.config(text=f"Sentyment: {data.get('sentiment', '-')}")
+
+    def _reset_search_gui(self):
+        self.dwarf_result_box.delete(1.0, tk.END)
+        self.dwarf_sentiment_label.config(text="Sentyment: -")
+
 
     def _run_pca_on_results(self):
-        if "white_dwarf" not in self.app_windows or not self.app_windows["white_dwarf"].winfo_exists():
+        if "web_explorer" not in self.app_windows or not self.app_windows["web_explorer"].winfo_exists():
             messagebox.showinfo("Informacja", "Najpierw wykonaj wyszukiwanie, aby uzyskać tekst do analizy.")
             return
         results_text = self.dwarf_result_box.get("1.0", tk.END)
@@ -1273,11 +1283,6 @@ if __name__ == "__main__":
     root = tk.Tk()
     root.title("SecureOS")
     root.geometry("1024x768")
-    app = OS(root)
-    root.mainloop()
-    
     my_os = OS(root)
-    
     root.protocol("WM_DELETE_WINDOW", my_os.shutdown)
-    
     root.mainloop()
