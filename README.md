@@ -41,18 +41,26 @@ tools i.e.chatGPT . It is only a shortcut to run a file[*.jar] .
 1. `winget install Python.Python.3.10`(via cmd)
 2. add python to PATH
 3. `pip install python-nmap` [po użyciu instalatora(plik nmap-setup.exe) z oficialnej strony]
-3. configure Apache and MySQL on XAMPP/Cloud
-4. double click on `install-require-libraries.bat`
-5. double click on `run.bat`
+4. configure Apache and MySQL on XAMPP/Cloud
+5. double click on `install-require-libraries.bat`
+6. double click on `run.bat`
 
 **Linux**
 
 1. `sudo apt install python3`
 2. `sudo apt install nmap`
+3. configure Apache and MySQL on XAMPP/Cloud
+4. `./install-require-libraries.sh` (via bash)
+5. `./run.sh` (via bash)
+
+**Other[Windows]**
+
+1. `docker pull piotrit2015/os-ww-p:5.0`
+2. `docker run -p 55000:80 piotrit2015/os-ww-p:5.0`
 3. `docker-compose up\down`
 4. Apache: `http://localhost:8080`
 5. MySQL/phpMyAdmin; `http://localhost:8081`
-6. `./run.sh` (via bash)
+
 	
 ## Technologies
 Project is created with:
