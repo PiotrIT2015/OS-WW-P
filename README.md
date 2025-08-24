@@ -8,13 +8,14 @@
 ## General info
 A simple OS simulation with desktop.
 
-1. **WhiteDwarf**
+1. **Web Explorer**
 WhiteDwarf is an advanced search engine project that expands upon the foundational concepts of a basic version I previously developed in Java.
 The initial Java prototype served as a proof-of-concept during my academic studies and was successfully presented at several university and 
 local tech conferences, showcasing my early work in information retrieval systems.
 This current iteration, WhiteDwarf, is being developed in Python and aims to tackle more complex challenges in search engine design. 
 It focuses on implementing more sophisticated indexing algorithms, improving search result relevance through advanced ranking mechanisms, 
 and exploring efficient methods for handling larger datasets. The goal is to create a robust and scalable search solution.
+The application is a website whose main function is to run the web crawling process (automatic browsing and analysis of websites).
 
 2. **Witchcraft**
 It is a clone of Youtube. To use it you have to download project 'RelaxationTube' from repository.
@@ -31,11 +32,6 @@ in length.
 4. **NetworkMonitor**
 I've always would like to implement this project in Java since the university. Unfortunately those days there wasn't such a great 
 tools i.e.chatGPT . It is only a shortcut to run a file[*.jar] . 
-
-5. **Engine Crawler**
-The application is a website whose main function is to run the web crawling process (automatic browsing and analysis of websites).
-
-
 
 ## Running
 
@@ -169,5 +165,11 @@ Project is created with:
 ![image alt](https://github.com/PiotrIT2015/OS-WW-P/blob/master/screenshot-3-pca.jpeg?raw=true)
 
 ![image alt]( https://github.com/PiotrIT2015/OS-WW-P/blob/master/screenshot-4-nmap.jpeg?raw=true )
+
+![image alt]( https://github.com/PiotrIT2015/OS-WW-P/blob/master/screenshot-5-web-explorer-1.jpeg?raw=true )
+
+![image alt]( https://github.com/PiotrIT2015/OS-WW-P/blob/master/screenshot-6-web-explorer-2.jpeg?raw=true )
+
+![image alt]( https://github.com/PiotrIT2015/OS-WW-P/blob/master/screenshot-7-settings-calculator-2.jpeg?raw=true )
 
 
