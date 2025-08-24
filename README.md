@@ -32,6 +32,9 @@ in length.
 I've always would like to implement this project in Java since the university. Unfortunately those days there wasn't such a great 
 tools i.e.chatGPT . It is only a shortcut to run a file[*.jar] . 
 
+5. **Engine Crawler**
+The application is a website whose main function is to run the web crawling process (automatic browsing and analysis of websites).
+
 
 
 ## Running
