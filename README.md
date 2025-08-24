@@ -56,7 +56,7 @@ tools i.e.chatGPT . It is only a shortcut to run a file[*.jar] .
 **Other[Windows]**
 
 1. `docker-compose up\down`
-2, os-ww-p: `http://localhost:5000`
+2. os-ww-p: `http://localhost:5000`
 3. Apache: `http://localhost:5001`
 4. MySQL/phpMyAdmin; `http://localhost:5002`
 
