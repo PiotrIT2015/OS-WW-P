@@ -106,7 +106,7 @@ docker run -d \
   --name os-ww-p \
   --network secure_network \
   --restart unless-stopped \
-  -v $(pwd):/app \
+  -v $(pwd):/main.py \
   -p 55000:80 \
   -e MYSQL_HOST=mysql_db \
   -e MYSQL_USER=root \
