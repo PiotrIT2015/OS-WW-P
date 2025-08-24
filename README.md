@@ -60,6 +60,60 @@ tools i.e.chatGPT . It is only a shortcut to run a file[*.jar] .
 3. Apache: `http://localhost:55001`
 4. MySQL/phpMyAdmin; `http://localhost:55002`
 
+**Other[Linux]**
+
+1. `docker network create secure_network`
+
+1. `docker volume create mysql_data
+`docker run -d \
+`  --name mysql_db \
+`  --network secure_network \
+`  --restart unless-stopped \
+`  -e MYSQL_ROOT_PASSWORD=rootpassword \
+`  -e MYSQL_DATABASE=mydatabase \
+`  -e MYSQL_USER=user \
+`  -e MYSQL_PASSWORD=password \
+`  -v mysql_data:/var/lib/mysql \
+`  mysql:8.0`
+
+2. `docker pull piotrit2015/os-ww-p:5.0`
+`docker run -d \
+`  --name os-ww-p \
+`  --network secure_network \
+`  --restart unless-stopped \
+`  -v $(pwd):/app \
+`  -p 55000:80 \
+`  -e MYSQL_HOST=db \
+`  -e MYSQL_USER=root \
+`  -e MYSQL_PASSWORD=" " \
+`  -e MYSQL_DATABASE=search_db \
+`  --link mysql_db:db \
+`  piotrit2015/os-ww-p:5.0`
+
+3.
+`docker run -d \
+`  --name apache_server \
+`  --network secure_network \
+`  --restart unless-stopped \
+`  -p 55001:80 \
+`  -v $(pwd)/apache.conf:/usr/local/apache2/conf/extra/httpd-vhosts.conf \
+`  --link os-ww-p:app \
+`  httpd:2.4`
+
+4.
+`docker run -d \
+`  --name phpmyadmin_ui \
+`  --network secure_network \
+`  --restart unless-stopped \
+`  -p 55002:80 \
+`  -e PMA_HOST=db \
+`  -e PMA_PORT=3306 \
+`  --link mysql_db:db \
+`  phpmyadmin:latest`
+
+
+
+
 	
 ## Technologies
 Project is created with:
