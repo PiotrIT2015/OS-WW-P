@@ -9,3 +9,5 @@ textblob
 numpy
 scipy
 scikit-learn
+shutil
+tkinter
