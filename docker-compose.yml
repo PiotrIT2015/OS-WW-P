@@ -6,6 +6,8 @@ services:
     restart: unless-stopped
     volumes:
       - .:/app
+    ports:
+      - "55000:80"
     environment:
       - MYSQL_HOST=db
       - MYSQL_USER=root
@@ -20,7 +22,7 @@ services:
     container_name: apache_server
     restart: unless-stopped
     ports:
-      - "8080:80"
+      - "55001:80"
     volumes:
       - ./apache.conf:/usr/local/apache2/conf/extra/httpd-vhosts.conf
     depends_on:
@@ -45,7 +47,7 @@ services:
     container_name: phpmyadmin_ui
     restart: unless-stopped
     ports:
-      - "8081:80"
+      - "55002:80"
     environment:
       - PMA_HOST=db
       - PMA_PORT=3306
