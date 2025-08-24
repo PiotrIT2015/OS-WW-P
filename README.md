@@ -36,7 +36,7 @@ tools i.e.chatGPT . It is only a shortcut to run a file[*.jar] .
 
 ## Running
 
-**Microsoft Windows**
+**MS Windows**
 
 1. `winget install Python.Python.3.10`(via cmd)
 2. add python to PATH
@@ -45,6 +45,13 @@ tools i.e.chatGPT . It is only a shortcut to run a file[*.jar] .
 5. double click on `install-require-libraries.bat`
 6. double click on `run.bat`
 
+**Other[MS Windows]**
+
+1. `docker-compose up\down`
+2. os-ww-p: `http://localhost:55000`
+3. Apache: `http://localhost:55001`
+4. MySQL/phpMyAdmin; `http://localhost:55002`
+
 **Linux**
 
 1. `sudo apt install python3`
@@ -52,13 +59,6 @@ tools i.e.chatGPT . It is only a shortcut to run a file[*.jar] .
 3. configure Apache and MySQL on XAMPP/Cloud
 4. `./install-require-libraries.sh` (via bash)
 5. `./run.sh` (via bash)
-
-**Other[Windows]**
-
-1. `docker-compose up\down`
-2. os-ww-p: `http://localhost:55000`
-3. Apache: `http://localhost:55001`
-4. MySQL/phpMyAdmin; `http://localhost:55002`
 
 **Other[Linux]**
 
