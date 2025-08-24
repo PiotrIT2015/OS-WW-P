@@ -11,3 +11,4 @@ pip install -r requirements.txt
 echo
 echo "Instalacja zakończona. Naciśnij Enter, aby kontynuować..."
 read
+
