@@ -32,7 +32,10 @@ import csv
 import shutil
 import re
 import random
-import nmap # DODANO: Import dla skanera Nmap
+import nmap
+# NOWY KOD: Import potrzebny do łączenia linków względnych w crawlerze
+from urllib.parse import urljoin, urlparse
+# KONIEC NOWEGO KODU
 
 # Stałe wyrażeń regularnych z [kod 2]
 IP_ADDRESS_RE = re.compile(r"^(?=.*[^\.]$)((25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.?){4}$")
@@ -551,9 +554,11 @@ class OS:
             {"name": "Pandas Analyzer", "icon": "chart_icon.png", "action": self.open_pandas_analyzer},
             {"name": "PCA Analyzer", "icon": "chart_icon.png", "action": self.open_pca_analyzer},
             {"name": "White Dwarf Search", "icon": "browser.png", "action": lambda: open_white_dwarf(self)},
+            # ### NOWY KOD ###
+            {"name": "Engine++ Crawler", "icon": "browser.png", "action": self.open_enginepp_crawler},
+            # ### KONIEC NOWEGO KODU ###
             {"name": "WhiteDwarf Shodan", "icon": "browser.png", "action": self.open_white_dwarf_shodan},
             {"name": "Network Monitor", "icon": "network_monitor.png", "action": self.launch_java_app},
-            # DODANO NOWĄ APLIKACJĘ NMAP
             {"name": "Nmap Scanner", "icon": "network_scanner.png", "action": self.open_nmap_scanner},
             {"name": "WitchCraft (Web)", "icon": "musical-note.png", "action": self.open_yii_app},
             {"name": "Settings", "icon": "settings_icon.png", "action": self.open_settings},
@@ -616,7 +621,108 @@ class OS:
         else:
             self.app_windows["file_manager"].lift()
     
-    # POCZĄTEK: NOWE METODY DLA APLIKACJI NMAP SCANNER
+    # ### NOWY KOD: POCZĄTEK METOD DLA APLIKACJI ENGINE++ CRAWLER ###
+    def open_enginepp_crawler(self):
+        """Otwiera aplikację Engine++ Crawler."""
+        if "enginepp_crawler" not in self.app_windows or not self.app_windows["enginepp_crawler"].winfo_exists():
+            win = tk.Toplevel(self.root)
+            win.title("Engine++ Crawler")
+            win.geometry("700x550")
+            self.app_windows["enginepp_crawler"] = win
+            self.create_enginepp_crawler_widgets(win)
+            self.add_taskbar_button("enginepp_crawler", "🕷️ Crawler", win)
+        else:
+            self.app_windows["enginepp_crawler"].lift()
+
+    def create_enginepp_crawler_widgets(self, parent):
+        """Tworzy widżety dla aplikacji Engine++ Crawler."""
+        input_frame = ttk.Frame(parent, padding="10")
+        input_frame.pack(fill=tk.X)
+
+        ttk.Label(input_frame, text="Start URL:").pack(side=tk.LEFT, padx=(0, 5))
+        self.crawler_url_entry = ttk.Entry(input_frame, width=40)
+        self.crawler_url_entry.insert(0, "http://google.com")
+        self.crawler_url_entry.pack(side=tk.LEFT, expand=True, fill=tk.X, padx=5)
+        
+        self.crawler_run_button = ttk.Button(input_frame, text="Start Crawl", command=self._run_crawl_thread)
+        self.crawler_run_button.pack(side=tk.LEFT, padx=(10, 0))
+
+        results_frame = ttk.Frame(parent, padding="5")
+        results_frame.pack(fill=tk.BOTH, expand=True)
+
+        self.crawler_status_label = ttk.Label(results_frame, text="Gotowy.", font=("Helvetica", 10))
+        self.crawler_status_label.pack(side=tk.BOTTOM, fill=tk.X)
+
+        self.crawler_results_text = scrolledtext.ScrolledText(results_frame, wrap=tk.WORD, state=tk.DISABLED)
+        self.crawler_results_text.pack(fill=tk.BOTH, expand=True)
+
+    def _run_crawl_thread(self):
+        """Uruchamia crawling w osobnym wątku."""
+        url = self.crawler_url_entry.get()
+        if not url or not url.startswith(('http://', 'https://')):
+            messagebox.showerror("Błąd", "Proszę podać prawidłowy adres URL (z http:// lub https://).")
+            return
+
+        self.crawler_run_button.config(state=tk.DISABLED)
+        self.crawler_results_text.config(state=tk.NORMAL)
+        self.crawler_results_text.delete('1.0', tk.END)
+        self.crawler_results_text.config(state=tk.DISABLED)
+        self.crawler_status_label.config(text=f"Crawling {url}...")
+
+        crawl_thread = threading.Thread(
+            target=self._perform_crawl,
+            args=(url,),
+            daemon=True
+        )
+        crawl_thread.start()
+
+    def _perform_crawl(self, url):
+        """Logika crawlingu (wykonywana w wątku)."""
+        try:
+            headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/58.0.3029.110 Safari/537.36'}
+            response = requests.get(url, headers=headers, timeout=10)
+            response.raise_for_status()
+
+            soup = BeautifulSoup(response.text, 'html.parser')
+            links = set()
+            for a_tag in soup.find_all('a', href=True):
+                href = a_tag['href']
+                # Przekształć linki względne na bezwzględne
+                absolute_url = urljoin(url, href)
+                # Sprawdź, czy URL jest poprawny (ma schemat i domenę)
+                parsed_url = urlparse(absolute_url)
+                if bool(parsed_url.scheme) and bool(parsed_url.netloc):
+                    links.add(absolute_url)
+            
+            result_list = sorted(list(links))
+            self.root.after(0, self._update_crawler_gui, result_list)
+
+        except requests.RequestException as e:
+            error_msg = f"Błąd połączenia: {e}"
+            self.root.after(0, self._update_crawler_gui, [error_msg], is_error=True)
+        except Exception as e:
+            error_msg = f"Wystąpił nieoczekiwany błąd: {e}"
+            self.root.after(0, self._update_crawler_gui, [error_msg], is_error=True)
+
+    def _update_crawler_gui(self, links, is_error=False):
+        """Aktualizuje interfejs użytkownika crawlera po zakończeniu zadania."""
+        self.crawler_results_text.config(state=tk.NORMAL)
+        self.crawler_results_text.delete('1.0', tk.END)
+
+        if not is_error:
+            self.crawler_status_label.config(text=f"Zakończono. Znaleziono {len(links)} unikalnych linków.")
+            if links:
+                self.crawler_results_text.insert('1.0', "\n".join(links))
+            else:
+                self.crawler_results_text.insert('1.0', "Nie znaleziono żadnych linków na tej stronie.")
+        else:
+            self.crawler_status_label.config(text="Crawl nie powiódł się.")
+            self.crawler_results_text.insert('1.0', links[0])
+
+        self.crawler_results_text.config(state=tk.DISABLED)
+        self.crawler_run_button.config(state=tk.NORMAL)
+    # ### KONIEC NOWEGO KODU ###
+
     def open_nmap_scanner(self):
         """Otwiera aplikację Nmap Banner Scanner."""
         if "nmap_scanner" not in self.app_windows or not self.app_windows["nmap_scanner"].winfo_exists():
@@ -631,40 +737,28 @@ class OS:
 
     def create_nmap_scanner_widgets(self, parent):
         """Tworzy widżety dla aplikacji Nmap."""
-        # --- Ramka na pola wejściowe ---
         input_frame = ttk.Frame(parent, padding="10")
         input_frame.pack(fill=tk.X)
-
         ttk.Label(input_frame, text="Host:").pack(side=tk.LEFT, padx=(0, 5))
         self.nmap_host_entry = ttk.Entry(input_frame, width=20)
         self.nmap_host_entry.insert(0, "127.0.0.1")
         self.nmap_host_entry.pack(side=tk.LEFT, expand=True, fill=tk.X, padx=5)
-
         ttk.Label(input_frame, text="First Port:").pack(side=tk.LEFT, padx=5)
         self.nmap_start_port_entry = ttk.Entry(input_frame, width=8)
         self.nmap_start_port_entry.insert(0, "1")
         self.nmap_start_port_entry.pack(side=tk.LEFT, padx=5)
-
         ttk.Label(input_frame, text="Last Port:").pack(side=tk.LEFT, padx=5)
         self.nmap_end_port_entry = ttk.Entry(input_frame, width=8)
         self.nmap_end_port_entry.insert(0, "1024")
         self.nmap_end_port_entry.pack(side=tk.LEFT, padx=5)
-        
         self.nmap_run_button = ttk.Button(input_frame, text="Run Scan", command=self._run_nmap_scan_thread)
         self.nmap_run_button.pack(side=tk.LEFT, padx=(10, 0))
-
-        # --- Ramka główna na wyniki i wykres ---
         main_results_frame = ttk.Frame(parent, padding="5")
         main_results_frame.pack(fill=tk.BOTH, expand=True)
-
-        # --- Pole tekstowe na wyniki ---
         self.nmap_output_text = scrolledtext.ScrolledText(main_results_frame, height=10, wrap=tk.WORD)
         self.nmap_output_text.pack(fill=tk.BOTH, expand=True, pady=(0, 5))
-
-        # --- Wykres Matplotlib ---
         self.nmap_fig = Figure(figsize=(5, 3), dpi=100)
         self.nmap_plot = self.nmap_fig.add_subplot(111)
-        
         self.nmap_canvas = FigureCanvasTkAgg(self.nmap_fig, master=main_results_frame)
         self.nmap_canvas.get_tk_widget().pack(side=tk.TOP, fill=tk.BOTH, expand=True)
         self.nmap_canvas.draw()
@@ -678,24 +772,15 @@ class OS:
         except ValueError:
             messagebox.showerror("Błąd", "Porty muszą być liczbami całkowitymi.")
             return
-
         if not host:
             messagebox.showerror("Błąd", "Nazwa hosta nie może być pusta.")
             return
-
-        # Zablokuj przycisk i wyczyść poprzednie wyniki
         self.nmap_run_button.config(state=tk.DISABLED)
         self.nmap_output_text.delete('1.0', tk.END)
         self.nmap_output_text.insert('1.0', f"Skanowanie {host} na portach {p_start}-{p_end}...\nTo może potrwać dłuższą chwilę.")
         self.nmap_plot.clear()
         self.nmap_canvas.draw()
-
-        # Uruchomienie skanowania w wątku
-        scan_thread = threading.Thread(
-            target=self._perform_nmap_scan,
-            args=(host, p_start, p_end),
-            daemon=True
-        )
+        scan_thread = threading.Thread(target=self._perform_nmap_scan, args=(host, p_start, p_end), daemon=True)
         scan_thread.start()
 
     def _perform_nmap_scan(self, host, p_start, p_end):
@@ -703,51 +788,34 @@ class OS:
         try:
             nm = nmap.PortScanner()
             port_range = f"{p_start}-{p_end}"
-            
-            # Ta funkcja jest blokująca, dlatego jest w wątku
-            nm.scan(
-                hosts=host,
-                ports=port_range,
-                arguments="-sV --script banner --host-timeout 15m --max-retries 2",
-            )
-            
-            # Przygotowanie wyników
+            nm.scan(hosts=host, ports=port_range, arguments="-sV --script banner --host-timeout 15m --max-retries 2")
             open_ports, banner_sizes = [], []
             result_string = ""
-
             if host not in nm.all_hosts():
                 result_string = f"Host {host} nie odpowiada lub jest niedostępny."
                 self.root.after(0, self._update_nmap_gui, result_string, [], [])
                 return
-
             for proto in nm[host].all_protocols():
                 for port in sorted(nm[host][proto].keys()):
                     state = nm[host][proto][port]["state"]
                     if state != "open":
                         continue
-
                     service = nm[host][proto][port].get("name", "?")
                     product = nm[host][proto][port].get("product", "")
                     version = nm[host][proto][port].get("version", "")
                     extrainfo = nm[host][proto][port].get("extrainfo", "")
                     scripts = nm[host][proto][port].get("script", {})
                     banner = scripts.get("banner", "").strip().replace('\n', ' ').replace('\r', '')
-
                     line1 = f"TCP {port:>5} | {service:<10} | {' '.join(filter(None, [product, version, extrainfo]))}\n"
                     result_string += line1
                     if banner:
                         line2 = f"           banner: {banner}\n"
                         result_string += line2
-                    
                     open_ports.append(port)
                     banner_sizes.append(len(banner.encode()))
-            
             if not open_ports:
                 result_string += "\nBrak otwartych portów lub bannerów w podanym zakresie."
-
-            # Aktualizacja GUI z wątku za pomocą 'after'
             self.root.after(0, self._update_nmap_gui, result_string, open_ports, banner_sizes)
-
         except nmap.nmap.PortScannerError as e:
             error_msg = f"Błąd Nmap: {e}\n\nSprawdź, czy Nmap jest zainstalowany i dostępny w ścieżce systemowej."
             self.root.after(0, self._update_nmap_gui, error_msg, [], [])
@@ -757,11 +825,8 @@ class OS:
 
     def _update_nmap_gui(self, result_text, open_ports, banner_sizes):
         """Aktualizuje interfejs użytkownika Nmap Scanner po zakończeniu skanowania."""
-        # Aktualizacja pola tekstowego
         self.nmap_output_text.delete('1.0', tk.END)
         self.nmap_output_text.insert('1.0', result_text)
-
-        # Aktualizacja wykresu
         self.nmap_plot.clear()
         if open_ports:
             host = self.nmap_host_entry.get()
@@ -771,12 +836,8 @@ class OS:
             self.nmap_plot.set_ylabel("Długość bannera (B)")
             self.nmap_plot.grid(True)
             self.nmap_fig.tight_layout()
-        
         self.nmap_canvas.draw()
-        
-        # Odblokuj przycisk
         self.nmap_run_button.config(state=tk.NORMAL)
-    # KONIEC: NOWE METODY DLA APLIKACJI NMAP SCANNER
 
     def open_settings(self):
         if "settings" not in self.app_windows or not self.app_windows["settings"].winfo_exists():
@@ -793,47 +854,35 @@ class OS:
             title="Wybierz 4 pliki do analizy",
             filetypes=[("ASC files", "*.asc"), ("All files", "*.*")]
         )
-
-        if not flista:
-            return
-
+        if not flista: return
         if len(flista) != 4:
             messagebox.showerror("Błąd", f"Oczekiwano 4 plików, a wybrano {len(flista)}. Proszę spróbować ponownie.")
             return
-
         try:
             print("Rozpoczynam analizę plików...")
             PATH_1, PATH_2, PATH_3, PATH_4, PATH_5, PATH_6, PATH_7 = "path1.csv", "path2.csv", "path3.csv", "path4.csv", "path5.csv", "path6.csv", "path7.csv"
-
             print(f"Przetwarzanie: {flista[0]}")
             BTNGeen = openCSV(flista[0])
             BTNGeenBezPow = BezPow(BTNGeen)
             SaveFile(BTNGeenBezPow, PATH_1)
-
             print(f"Przetwarzanie: {flista[1]}")
             BTNIllumina = openCSV(flista[1])
             BTNIlluminaBezPow = BezPow(BTNIllumina)
             SaveFile(BTNIlluminaBezPow, PATH_2)
-
             BTNGeenIluminaCT = CompareTotal(BTNGeenBezPow, BTNIlluminaBezPow)
             SaveFile(BTNGeenIluminaCT, PATH_3)
-
             print(f"Przetwarzanie: {flista[2]}")
             UMDGeen = openCSV(flista[2])
             UMDGeenBezPow = BezPow(UMDGeen)
             SaveFile(UMDGeenBezPow, PATH_4)
-
             print(f"Przetwarzanie: {flista[3]}")
             UMDIllumina = openCSV(flista[3])
             UMDIlluminaBezPow = BezPow(UMDIllumina)
             SaveFile(UMDIlluminaBezPow, PATH_5)
-
             UMDGeenIluminaCT = CompareTotal(UMDGeenBezPow, UMDIlluminaBezPow)
             SaveFile(UMDGeenIluminaCT, PATH_6)
-
             BTNUMDGeenIluminaCT = CompareTotal(BTNGeenIluminaCT, UMDGeenIluminaCT)
             SaveFile(BTNUMDGeenIluminaCT, PATH_7)
-
             print("Analiza zakończona pomyślnie.")
             messagebox.showinfo("Sukces", "Analiza została pomyślnie zakończona.")
         except Exception as e:
@@ -845,16 +894,11 @@ class OS:
             title="Wybierz pliki do analizy PCA",
             filetypes=[("ASC files", "*.asc"), ("All files", "*.*")]
         )
-
-        if not flista:
-            return
-
+        if not flista: return
         n = len(flista)
         colA, colB = np.loadtxt(flista[0], usecols=(0, 1), unpack=True)
         m = len(colB)
-        E = np.zeros((m, n))
-        D = np.zeros((m, n))
-
+        E, D = np.zeros((m, n)), np.zeros((m, n))
         for i in range(n):
             colA, colB = np.loadtxt(flista[i], usecols=(0, 1), unpack=True)
             if len(colB) != m:
@@ -863,26 +907,21 @@ class OS:
             for j in range(m):
                 E[j][i] = colA[j]
                 D[j][i] = colB[j]
-
         plt.plot(D)
         plt.title("Dane wejściowe")
         plt.show()
-
         Drepp = np.zeros((m, n, n))
         for j in range(n):
             print(f"Obliczanie PCA dla {j+1} komponentów...")
             Drepp[:, :, j] = PCA(D, j + 1)
-
         pplist = np.zeros(n)
         for i in range(n):
             pplist[i] = np.sum(abs(Drepp[:, :, i] - D))
-
         plt.plot(pplist)
         plt.title("Suma błędów absolutnych vs. liczba komponentów")
         plt.xlabel("Liczba komponentów")
         plt.ylabel("Suma błędów")
         plt.show()
-
         num_components_to_plot = min(3, n-1)
         if num_components_to_plot >= 0:
             plt.plot(D, Drepp[:, :, num_components_to_plot], 'o', [0, 1.2], [0, 1.2], '-')
@@ -894,35 +933,26 @@ class OS:
     def create_file_manager_widgets(self, parent):
         main_frame = Frame(parent)
         main_frame.pack(fill=tk.BOTH, expand=True)
-
         op_frame = ttk.LabelFrame(main_frame, text="Operations")
         op_frame.pack(padx=10, pady=5, fill=tk.X)
-
         self.file_manager_entry = ttk.Entry(op_frame, width=20)
         self.file_manager_entry.pack(side=tk.LEFT, padx=5, pady=5)
-        
         ttk.Button(op_frame, text="Create File", command=self.create_real_file).pack(side=tk.LEFT, padx=5)
         ttk.Button(op_frame, text="Open", command=self.open_selected_item_from_manager).pack(side=tk.LEFT, padx=5)
         ttk.Button(op_frame, text="Delete", command=self.delete_selected_item_from_manager).pack(side=tk.LEFT, padx=5)
         ttk.Button(op_frame, text="Refresh", command=self.refresh_file_tree).pack(side=tk.LEFT, padx=5)
-
         tree_frame = ttk.Frame(main_frame)
         tree_frame.pack(padx=10, pady=10, fill=tk.BOTH, expand=True)
-        
         self.file_manager_tree = ttk.Treeview(tree_frame, show="tree", selectmode=tk.BROWSE)
         self.file_manager_tree.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
-        
         scrollbar = ttk.Scrollbar(tree_frame, orient="vertical", command=self.file_manager_tree.yview)
         scrollbar.pack(side=tk.RIGHT, fill="y")
         self.file_manager_tree.config(yscrollcommand=scrollbar.set)
-        
         self.refresh_file_tree()
 
     def populate_file_tree(self, parent_path, parent_node):
         """Rekurencyjnie wypełnia Treeview strukturą plików i katalogów."""
-        if not os.path.isdir(parent_path):
-            return
-        
+        if not os.path.isdir(parent_path): return
         try:
             items = sorted(os.listdir(parent_path), key=lambda x: not os.path.isdir(os.path.join(parent_path, x)))
             for item_name in items:
@@ -932,7 +962,6 @@ class OS:
                     self.file_manager_tree.insert(node, 'end', text='...')
         except PermissionError:
             self.file_manager_tree.insert(parent_node, 'end', text='[Dostęp zabroniony]', open=False)
-
 
     def refresh_file_tree(self):
         """Czyści i ponownie wypełnia drzewo plików."""
@@ -963,16 +992,12 @@ class OS:
         if not selected_item:
             messagebox.showwarning("Uwaga", "Nie wybrano żadnego elementu.")
             return
-
         item_path = self.file_manager_tree.item(selected_item[0], "values")[0]
         item_name = os.path.basename(item_path)
-        
         if messagebox.askyesno("Potwierdź usunięcie", f"Czy na pewno chcesz usunąć '{item_name}'?"):
             try:
-                if os.path.isfile(item_path):
-                    os.remove(item_path)
-                elif os.path.isdir(item_path):
-                    shutil.rmtree(item_path)
+                if os.path.isfile(item_path): os.remove(item_path)
+                elif os.path.isdir(item_path): shutil.rmtree(item_path)
                 messagebox.showinfo("Sukces", f"'{item_name}' został usunięty.")
                 self.refresh_file_tree()
             except Exception as e:
@@ -984,17 +1009,13 @@ class OS:
         if not file_name:
             messagebox.showerror("Błąd", "Nazwa pliku nie może być pusta.")
             return
-
         selected_item = self.file_manager_tree.selection()
         if selected_item:
             parent_path = self.file_manager_tree.item(selected_item[0], "values")[0]
-            if os.path.isfile(parent_path):
-                parent_path = os.path.dirname(parent_path)
+            if os.path.isfile(parent_path): parent_path = os.path.dirname(parent_path)
         else:
             parent_path = os.getcwd()
-
         new_file_path = os.path.join(parent_path, file_name)
-        
         try:
             if not os.path.exists(new_file_path):
                 with open(new_file_path, 'w') as f: pass
@@ -1045,8 +1066,7 @@ class OS:
         return IP_ADDRESS_RE.match(ip_addr) is not None
 
     def _mask_valid(self, mask):
-        if not self._ip_address_valid(mask):
-            return False
+        if not self._ip_address_valid(mask): return False
         mask_binary = self._convert_ip_addr_decimal_to_binary(mask)
         return MASK_BINARY_RE.match(mask_binary) is not None
 
@@ -1059,56 +1079,40 @@ class OS:
         return '.'.join(octets)
 
     def _calculate_subnet_gui(self):
-        ip_addr = self.subnet_ip_entry.get()
-        mask = self.subnet_mask_entry.get()
-
+        ip_addr, mask = self.subnet_ip_entry.get(), self.subnet_mask_entry.get()
         self.subnet_results_text.delete('1.0', tk.END)
-        self.network_addr_integer = None
-        self.broadcast_addr_integer = None
-
+        self.network_addr_integer, self.broadcast_addr_integer = None, None
         if not self._ip_address_valid(ip_addr):
             self.subnet_results_text.insert(tk.END, "Błąd: Nieprawidłowy format adresu IP.")
             return
         if not self._mask_valid(mask):
             self.subnet_results_text.insert(tk.END, "Błąd: Nieprawidłowy format maski podsieci.")
             return
-
         ip_addr_binary = self._convert_ip_addr_decimal_to_binary(ip_addr)
         mask_binary = self._convert_ip_addr_decimal_to_binary(mask)
-        
         mask_num_ones = mask_binary.count('1')
         self.network_addr_integer = int(ip_addr_binary, 2) & int(mask_binary, 2)
         network_addr_str = self._convert_ip_addr_int_to_human(self.network_addr_integer)
-
         wildcard_integer = ~int(mask_binary, 2) & 0xffffffff
         wildcard_str = self._convert_ip_addr_int_to_human(wildcard_integer)
-
         self.broadcast_addr_integer = self.network_addr_integer | wildcard_integer
         broadcast_addr_str = self._convert_ip_addr_int_to_human(self.broadcast_addr_integer)
-
-        if mask_num_ones == 32:
-            num_hosts = 1
-        elif mask_num_ones == 31:
-            num_hosts = 2
-        else:
-            num_hosts = 2**(32 - mask_num_ones) - 2
-
-        results = (
-            f"Adres IP:\t\t{ip_addr}\n"
-            f"Maska podsieci:\t{mask} (/{mask_num_ones})\n"
-            f"--------------------------------------------------\n"
-            f"Adres sieci:\t\t{network_addr_str}\n"
-            f"Adres rozgłoszeniowy:\t{broadcast_addr_str}\n"
-            f"Maska Wildcard:\t{wildcard_str}\n"
-            f"Liczba hostów:\t\t{num_hosts if num_hosts > 0 else 0}\n"
-        )
+        if mask_num_ones == 32: num_hosts = 1
+        elif mask_num_ones == 31: num_hosts = 2
+        else: num_hosts = 2**(32 - mask_num_ones) - 2
+        results = (f"Adres IP:\t\t{ip_addr}\n"
+                   f"Maska podsieci:\t{mask} (/{mask_num_ones})\n"
+                   f"--------------------------------------------------\n"
+                   f"Adres sieci:\t\t{network_addr_str}\n"
+                   f"Adres rozgłoszeniowy:\t{broadcast_addr_str}\n"
+                   f"Maska Wildcard:\t{wildcard_str}\n"
+                   f"Liczba hostów:\t\t{num_hosts if num_hosts > 0 else 0}\n")
         self.subnet_results_text.insert(tk.END, results)
 
     def _generate_random_ip_gui(self):
         if self.network_addr_integer is None or self.broadcast_addr_integer is None:
             messagebox.showwarning("Brak danych", "Najpierw oblicz parametry podsieci.")
             return
-        
         mask_num_ones = self._convert_ip_addr_decimal_to_binary(self.subnet_mask_entry.get()).count('1')
         if mask_num_ones < 31:
              start_range = self.network_addr_integer + 1
@@ -1119,7 +1123,6 @@ class OS:
         else:
              start_range = self.network_addr_integer
              end_range = self.broadcast_addr_integer
-
         random_ip_int = random.randint(start_range, end_range)
         random_ip_str = self._convert_ip_addr_int_to_human(random_ip_int)
         self.random_ip_label.config(text=random_ip_str)
@@ -1153,16 +1156,12 @@ class OS:
                 s.connect(("8.8.8.8", 80))
                 ip = s.getsockname()[0]
                 s.close()
-            except Exception:
-                ip = "Brak połączenia"
-            try:
-                hostname = socket.gethostname()
-            except Exception:
-                hostname = "Nieznany"
+            except Exception: ip = "Brak połączenia"
+            try: hostname = socket.gethostname()
+            except Exception: hostname = "Nieznany"
             self.root.after(0, lambda: self.ip_display.config(text=ip))
             self.root.after(0, lambda: self.hostname_display.config(text=hostname))
         threading.Thread(target=_get_info, daemon=True).start()
-
 
     def choose_background_color(self):
         color_code = colorchooser.askcolor(title="Choose Background Color")[1]
@@ -1221,13 +1220,11 @@ class OS:
         button = ttk.Button(self.task_button_area, text=app_name, command=lambda w=window: self.handle_taskbar_button_click(w))
         button.pack(side=tk.LEFT, padx=2, pady=2)
         self.taskbar_buttons[app_key] = button
-
         def on_close():
             button.destroy()
             if app_key in self.taskbar_buttons: del self.taskbar_buttons[app_key]
             if app_key in self.app_windows: del self.app_windows[app_key]
             window.destroy()
-
         window.protocol("WM_DELETE_WINDOW", on_close)
 
     def handle_taskbar_button_click(self, window):
@@ -1276,6 +1273,8 @@ if __name__ == "__main__":
     root = tk.Tk()
     root.title("SecureOS")
     root.geometry("1024x768")
+    app = OS(root)
+    root.mainloop()
     
     my_os = OS(root)
     
