@@ -4,7 +4,6 @@ from tkinter import scrolledtext, messagebox, filedialog, colorchooser, Listbox,
 import time
 import threading
 import os
-import uuid
 from collections import deque
 from PIL import Image, ImageTk
 from datetime import datetime
@@ -33,11 +32,9 @@ import shutil
 import re
 import random
 import nmap
-# NOWY KOD: Import potrzebny do łączenia linków względnych w crawlerze
 from urllib.parse import urljoin, urlparse
-# KONIEC NOWEGO KODU
 
-# Stałe wyrażeń regularnych z [kod 2]
+# Stałe wyrażeń regularnych
 IP_ADDRESS_RE = re.compile(r"^(?=.*[^\.]$)((25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.?){4}$")
 MASK_BINARY_RE = re.compile(r"^1*0*$")
 
@@ -183,50 +180,6 @@ def SaveFile(data, path):
 
 
 # --- Backend Tornado API ---
-class StockSearchHandler(tornado.web.RequestHandler):
-    def post(self):
-        try:
-            data = json.loads(self.request.body)
-            stock_symbol = data.get("symbol")
-
-            if not stock_symbol:
-                self.set_status(400)
-                self.write({"error": "Brak symbolu giełdowego."})
-                return
-
-            url = f"https://finance.yahoo.com/quote/{stock_symbol}/history?p={stock_symbol}"
-            response = requests.get(url, headers={'User-Agent': 'Mozilla/5.0'})
-            response.raise_for_status()
-
-            soup = BeautifulSoup(response.text, "html.parser")
-            rows = soup.find_all("tr", class_="BdT Bdc($seperatorColor)")
-
-            history = []
-            for row in rows:
-                cols = row.find_all("td")
-                if len(cols) >= 6:
-                    history.append([
-                        cols[0].text, cols[1].text, cols[2].text,
-                        cols[3].text, cols[4].text, cols[5].text
-                    ])
-
-            if not history:
-                self.set_status(404)
-                self.write({"error": f"Nie znaleziono danych dla symbolu '{stock_symbol}'."})
-                return
-
-            df = pd.DataFrame(history, columns=["Date", "Open", "High", "Low", "Close", "Volume"])
-            file_path = f"{stock_symbol}_history.csv"
-            df.to_csv(file_path, index=False)
-
-            self.write({"message": "Dane zapisane", "path": file_path})
-        except requests.exceptions.HTTPError as e:
-            self.set_status(e.response.status_code)
-            self.write({"error": f"Błąd HTTP podczas pobierania danych: {e}"})
-        except Exception as e:
-            self.set_status(500)
-            self.write({"error": f"Wystąpił wewnętrzny błąd serwera: {str(e)}"})
-
 class WebSearchHandler(tornado.web.RequestHandler):
     def post(self):
         conn = None
@@ -278,208 +231,11 @@ class WebSearchHandler(tornado.web.RequestHandler):
             if cursor: cursor.close()
             if conn and conn.is_connected(): conn.close()
 
-
-# --- Symulacja Systemu Operacyjnego (Procesy, Pliki, Scheduler) ---
-class Process:
-    def __init__(self, target, args=(), name=None, is_daemon=False):
-        self.id = uuid.uuid4()
-        self.target = target
-        self.args = args
-        self.name = name if name else f"Process-{self.id}"
-        self.is_daemon = is_daemon
-        self.thread = None
-        self.status = "waiting"
-        self.output = []
-
-    def start(self):
-        if self.status == "waiting":
-            self.status = "running"
-            self.thread = threading.Thread(target=self._run, daemon=self.is_daemon)
-            self.thread.start()
-
-    def _run(self):
-        try:
-            self.output.append(self.target(*self.args))
-        except Exception as e:
-            self.output.append(f"Error: {e}")
-        finally:
-            self.status = "stopped"
-
-class File:
-    def __init__(self, name):
-        self.name = name
-        self.content = ""
-
-class FileSystem:
-    def __init__(self):
-        self.files = {}
-
-    def create_file(self, name):
-        if name not in self.files:
-            self.files[name] = File(name)
-            return True
-        return False
-
-    def read_file(self, name):
-        return self.files.get(name, None)
-
-    def write_file(self, name, content):
-        if name in self.files:
-            self.files[name].content = content
-            return True
-        return False
-
-    def delete_file(self, name):
-        if name in self.files:
-            del self.files[name]
-            return True
-        return False
-
-class Scheduler:
-    def __init__(self):
-        self.tasks = deque()
-        self._run = True
-        self._thread = threading.Thread(target=self._schedule, daemon=True)
-        self._thread.start()
-
-    def add_task(self, process, interval):
-        self.tasks.append((process, interval, time.time()))
-
-    def _schedule(self):
-        while self._run:
-            if self.tasks:
-                process, interval, last_run = self.tasks.popleft()
-                if time.time() - last_run >= interval:
-                    process.start()
-                    self.tasks.append((process, interval, time.time()))
-                else:
-                    self.tasks.appendleft((process, interval, last_run))
-            time.sleep(0.1)
-
-    def stop(self):
-        self._run = False
-
-
-# --- Aplikacje GUI ---
-class ImageViewerApp:
-    def __init__(self, root):
-        self.root = root
-        self.root.title("White War Explorer")
-        self.root.geometry("1200x600")
-
-        self.current_directory = os.getcwd()
-        self.default_image_path = os.path.join(self.current_directory, "img", "sys", "ikigai.jpeg")
-
-        self.create_default_image_if_needed()
-        self.setup_gui()
-        self.populate_tree(self.current_directory, "")
-
-    def create_default_image_if_needed(self):
-        if not os.path.exists(self.default_image_path):
-            try:
-                os.makedirs(os.path.dirname(self.default_image_path), exist_ok=True)
-                img = Image.new('RGB', (800, 600), color='gray')
-                img.save(self.default_image_path)
-            except Exception as e:
-                print(f"Nie udało się stworzyć domyślnego obrazka: {e}")
-
-    def setup_gui(self):
-        main_frame = Frame(self.root)
-        main_frame.pack(fill="both", expand=True)
-
-        tree_frame = Frame(main_frame)
-        tree_frame.pack(side="left", fill="y", padx=5, pady=5)
-
-        self.tree = ttk.Treeview(tree_frame, show="tree", selectmode=tk.BROWSE)
-        self.tree.pack(side="left", fill="y", expand=True)
-        self.tree.bind("<<TreeviewSelect>>", self.on_tree_select)
-
-        ysb = ttk.Scrollbar(tree_frame, orient='vertical', command=self.tree.yview)
-        self.tree.configure(yscroll=ysb.set)
-        ysb.pack(side='right', fill='y')
-
-        self.display_frame = Frame(main_frame, bg="black")
-        self.display_frame.pack(side="right", fill="both", expand=True)
-
-        self.canvas = Canvas(self.display_frame, bg="black")
-        self.text_area = scrolledtext.ScrolledText(self.display_frame, wrap=tk.WORD, bg="#1e1e1e", fg="#d4d4d4", insertbackground="white")
-
-        self.show_default_image()
-
-    def populate_tree(self, parent_path, parent_node):
-        if not os.path.isdir(parent_path): return
-        items = sorted(os.listdir(parent_path), key=lambda x: (not os.path.isdir(os.path.join(parent_path, x)), x.lower()))
-        for item_name in items:
-            item_path = os.path.join(parent_path, item_name)
-            node = self.tree.insert(parent_node, 'end', text=item_name, open=False, values=[item_path])
-            if os.path.isdir(item_path):
-                self.populate_tree(item_path, node)
-
-    def on_tree_select(self, event):
-        selected_item = self.tree.selection()
-        if selected_item:
-            item_path = self.tree.item(selected_item[0], "values")[0]
-            if os.path.isfile(item_path): self.show_file_content(item_path)
-
-    def is_image_file(self, path):
-        return path.lower().endswith((".png", ".jpg", ".jpeg", ".gif", ".bmp"))
-
-    def is_text_file(self, path):
-        return path.lower().endswith((".txt", ".log", ".py", ".md", ".json", ".csv"))
-
-    def show_file_content(self, file_path):
-        if self.is_image_file(file_path):
-            self.show_image(file_path)
-        elif self.is_text_file(file_path):
-            self.show_text_content(file_path)
-        else:
-            if hasattr(self.root, 'my_os'):
-                self.root.my_os.open_with_default_app(file_path)
-
-    def show_image(self, image_path):
-        try:
-            self.text_area.pack_forget()
-            self.canvas.pack(fill="both", expand=True)
-            img = Image.open(image_path)
-            self.canvas.update_idletasks()
-            canvas_width, canvas_height = self.canvas.winfo_width(), self.canvas.winfo_height()
-            if canvas_width < 2 or canvas_height < 2: canvas_width, canvas_height = 800, 600
-            img.thumbnail((canvas_width, canvas_height), Image.Resampling.LANCZOS)
-            photo = ImageTk.PhotoImage(img)
-            self.canvas.delete("all")
-            self.canvas.create_image(canvas_width / 2, canvas_height / 2, image=photo, anchor="center")
-            self.canvas.image = photo
-        except Exception as e:
-            print(f"Error loading image {image_path}: {e}")
-            self.show_default_image()
-
-    def show_text_content(self, file_path):
-        try:
-            self.canvas.pack_forget()
-            self.text_area.pack(fill="both", expand=True)
-            with open(file_path, 'r', encoding='utf-8', errors='ignore') as file:
-                self.text_area.delete('1.0', tk.END)
-                self.text_area.insert('1.0', file.read())
-        except Exception as e:
-            self.text_area.delete('1.0', tk.END)
-            self.text_area.insert('1.0', f"Error reading file: {e}")
-
-    def show_default_image(self):
-        if os.path.exists(self.default_image_path):
-            self.show_image(self.default_image_path)
-        else:
-            self.text_area.pack_forget()
-            self.canvas.pack(fill="both", expand=True)
-            self.canvas.delete("all")
-
 # --- Główna klasa systemu operacyjnego ---
 class OS:
     def __init__(self, root):
         self.root = root
         self.root.my_os = self
-        self.processes = {}
-        self.filesystem = FileSystem()
-        self.scheduler = Scheduler()
         self.app_windows = {}
         self.taskbar_buttons = {}
         self.desktop_bg_color = "#3d405b"
@@ -491,6 +247,9 @@ class OS:
         self.start_tornado_server()
         self.network_addr_integer = None
         self.broadcast_addr_integer = None
+
+        # Ścieżka do obrazka domyślnego dla File Explorera
+        self.default_explorer_image_path = os.path.join(os.getcwd(), "default_explorer_image.png")
 
     def create_desktop(self):
         self.desktop = tk.Frame(self.root, bg=self.desktop_bg_color)
@@ -541,9 +300,7 @@ class OS:
             {"name": "File Explorer", "icon": "folder_icon.png", "action": self.open_file_manager},
             {"name": "Pandas Analyzer", "icon": "chart_icon.png", "action": self.open_pandas_analyzer},
             {"name": "PCA Analyzer", "icon": "chart_icon.png", "action": self.open_pca_analyzer},
-            # ### NOWY KOD ###
             {"name": "Web Explorer", "icon": "browser.png", "action": self.open_web_explorer},
-            # ### KONIEC NOWEGO KODU ###
             {"name": "Shodan - shortcut", "icon": "browser.png", "action": self.open_white_dwarf_shodan},
             {"name": "Network Monitor", "icon": "network_monitor.png", "action": self.launch_java_app},
             {"name": "Nmap Scanner", "icon": "network_scanner.png", "action": self.open_nmap_scanner},
@@ -599,16 +356,21 @@ class OS:
             messagebox.showerror("Error", f"Nie można otworzyć przeglądarki: {e}")
 
     def open_file_manager(self):
-        if "file_manager" not in self.app_windows or not self.app_windows["file_manager"].winfo_exists():
+        app_key = "file_manager"
+        if app_key not in self.app_windows or not self.app_windows[app_key].winfo_exists():
             win = tk.Toplevel(self.root)
             win.title("File Explorer")
-            self.app_windows["file_manager"] = win
+            win.geometry("1100x600")
+            self.app_windows[app_key] = win
+            
+            # Tworzy domyślny obrazek, jeśli go nie ma
+            self._create_default_explorer_image_if_needed()
+            
             self.create_file_manager_widgets(win)
-            self.add_taskbar_button("file_manager", "📁 Explorer", win)
+            self.add_taskbar_button(app_key, "📁 Explorer", win)
         else:
-            self.app_windows["file_manager"].lift()
+            self.app_windows[app_key].lift()
 
-    # ### NOWY KOD: POCZĄTEK METODY DLA POŁĄCZONEJ APLIKACJI ###
     def open_web_explorer(self):
         """Otwiera aplikację Web Explorer z zakładkami do wyszukiwania i crawlowania."""
         app_key = "web_explorer"
@@ -634,7 +396,6 @@ class OS:
             self.add_taskbar_button(app_key, "🌐 Web Explorer", win)
         else:
             self.app_windows[app_key].lift()
-    # ### KONIEC NOWEGO KODU ###
     
     def create_enginepp_crawler_widgets(self, parent):
         """Tworzy widżety dla aplikacji Engine++ Crawler."""
@@ -689,9 +450,7 @@ class OS:
             links = set()
             for a_tag in soup.find_all('a', href=True):
                 href = a_tag['href']
-                # Przekształć linki względne na bezwzględne
                 absolute_url = urljoin(url, href)
-                # Sprawdź, czy URL jest poprawny (ma schemat i domenę)
                 parsed_url = urlparse(absolute_url)
                 if bool(parsed_url.scheme) and bool(parsed_url.netloc):
                     links.add(absolute_url)
@@ -931,25 +690,134 @@ class OS:
             plt.ylabel("Odtworzone")
             plt.show()
 
+    # --- NOWY KOD: POCZĄTEK SEKCJI DLA ULEPSZONEGO FILE EXPLORERA ---
+
     def create_file_manager_widgets(self, parent):
+        """Tworzy widżety dla File Explorera z podglądem plików."""
+        # Główna ramka
         main_frame = Frame(parent)
         main_frame.pack(fill=tk.BOTH, expand=True)
+
+        # Ramka na operacje (przyciski)
         op_frame = ttk.LabelFrame(main_frame, text="Operations")
         op_frame.pack(padx=10, pady=5, fill=tk.X)
         self.file_manager_entry = ttk.Entry(op_frame, width=20)
         self.file_manager_entry.pack(side=tk.LEFT, padx=5, pady=5)
         ttk.Button(op_frame, text="Create File", command=self.create_real_file).pack(side=tk.LEFT, padx=5)
-        ttk.Button(op_frame, text="Open", command=self.open_selected_item_from_manager).pack(side=tk.LEFT, padx=5)
+        ttk.Button(op_frame, text="Open in App", command=self.open_selected_item_from_manager).pack(side=tk.LEFT, padx=5)
         ttk.Button(op_frame, text="Delete", command=self.delete_selected_item_from_manager).pack(side=tk.LEFT, padx=5)
         ttk.Button(op_frame, text="Refresh", command=self.refresh_file_tree).pack(side=tk.LEFT, padx=5)
-        tree_frame = ttk.Frame(main_frame)
-        tree_frame.pack(padx=10, pady=10, fill=tk.BOTH, expand=True)
-        self.file_manager_tree = ttk.Treeview(tree_frame, show="tree", selectmode=tk.BROWSE)
+
+        # Kontener dzielony na panel nawigacyjny i panel podglądu
+        paned_window = ttk.PanedWindow(main_frame, orient=tk.HORIZONTAL)
+        paned_window.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
+
+        # Lewy panel: drzewo plików
+        tree_container = ttk.Frame(paned_window, width=300)
+        paned_window.add(tree_container, weight=1)
+
+        self.file_manager_tree = ttk.Treeview(tree_container, show="tree", selectmode=tk.BROWSE)
         self.file_manager_tree.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
-        scrollbar = ttk.Scrollbar(tree_frame, orient="vertical", command=self.file_manager_tree.yview)
+        scrollbar = ttk.Scrollbar(tree_container, orient="vertical", command=self.file_manager_tree.yview)
         scrollbar.pack(side=tk.RIGHT, fill="y")
         self.file_manager_tree.config(yscrollcommand=scrollbar.set)
+        # Bindowanie zdarzenia zaznaczenia elementu
+        self.file_manager_tree.bind("<<TreeviewSelect>>", self._on_file_manager_tree_select)
+        
+        # Prawy panel: podgląd pliku
+        self.fm_display_frame = Frame(paned_window, bg="black")
+        paned_window.add(self.fm_display_frame, weight=3)
+        
+        self.fm_canvas = Canvas(self.fm_display_frame, bg="black", highlightthickness=0)
+        self.fm_text_area = scrolledtext.ScrolledText(self.fm_display_frame, wrap=tk.WORD, bg="#1e1e1e", fg="#d4d4d4", insertbackground="white")
+
         self.refresh_file_tree()
+        self._show_default_image_in_manager()
+    
+    def _create_default_explorer_image_if_needed(self):
+        """Tworzy domyślny obrazek dla File Explorera, jeśli nie istnieje."""
+        if not os.path.exists(self.default_explorer_image_path):
+            try:
+                img = Image.new('RGB', (800, 600), color=(40, 40, 40))
+                img.save(self.default_explorer_image_path)
+            except Exception as e:
+                print(f"Nie udało się stworzyć domyślnego obrazka dla explorera: {e}")
+
+    def _on_file_manager_tree_select(self, event):
+        """Obsługuje zdarzenie zaznaczenia elementu w drzewie File Explorera."""
+        selected_item = self.file_manager_tree.selection()
+        if selected_item:
+            item_path = self.file_manager_tree.item(selected_item[0], "values")[0]
+            if os.path.isfile(item_path):
+                self._show_file_manager_content(item_path)
+            else:
+                self._show_default_image_in_manager() # Pokaż domyślny obrazek po kliknięciu na katalog
+
+    def _is_image_file(self, path):
+        """Sprawdza, czy plik jest obrazem na podstawie rozszerzenia."""
+        return path.lower().endswith((".png", ".jpg", ".jpeg", ".gif", ".bmp"))
+
+    def _is_text_file(self, path):
+        """Sprawdza, czy plik jest plikiem tekstowym."""
+        return path.lower().endswith((".txt", ".log", ".py", ".md", ".json", ".csv"))
+
+    def _show_file_manager_content(self, file_path):
+        """Wybiera, jak wyświetlić zawartość pliku na podstawie jego typu."""
+        if self._is_image_file(file_path):
+            self._show_image_in_manager(file_path)
+        elif self._is_text_file(file_path):
+            self._show_text_in_manager(file_path)
+        else:
+            # Dla nieobsługiwanych typów, wyczyść podgląd i pokaż domyślny obraz
+            self._show_default_image_in_manager()
+
+    def _show_image_in_manager(self, image_path):
+        """Wyświetla obraz w panelu podglądu File Explorera."""
+        try:
+            self.fm_text_area.pack_forget()
+            self.fm_canvas.pack(fill="both", expand=True)
+            img = Image.open(image_path)
+            
+            # Czekaj na aktualizację wymiarów widgetu
+            self.fm_canvas.update_idletasks()
+            canvas_width = self.fm_canvas.winfo_width()
+            canvas_height = self.fm_canvas.winfo_height()
+
+            if canvas_width < 2 or canvas_height < 2:
+                canvas_width, canvas_height = 800, 600
+            
+            img.thumbnail((canvas_width, canvas_height), Image.Resampling.LANCZOS)
+            
+            photo = ImageTk.PhotoImage(img)
+            self.fm_canvas.delete("all")
+            self.fm_canvas.create_image(canvas_width / 2, canvas_height / 2, image=photo, anchor="center")
+            self.fm_canvas.image = photo # Ważne: zachowaj referencję
+        except Exception as e:
+            print(f"Błąd ładowania obrazu {image_path}: {e}")
+            self._show_default_image_in_manager()
+
+    def _show_text_in_manager(self, file_path):
+        """Wyświetla zawartość pliku tekstowego w panelu podglądu."""
+        try:
+            self.fm_canvas.pack_forget()
+            self.fm_text_area.pack(fill="both", expand=True)
+            with open(file_path, 'r', encoding='utf-8', errors='ignore') as file:
+                self.fm_text_area.delete('1.0', tk.END)
+                self.fm_text_area.insert('1.0', file.read())
+        except Exception as e:
+            self.fm_text_area.delete('1.0', tk.END)
+            self.fm_text_area.insert('1.0', f"Błąd odczytu pliku: {e}")
+
+    def _show_default_image_in_manager(self):
+        """Pokazuje domyślny obraz w panelu podglądu."""
+        if os.path.exists(self.default_explorer_image_path):
+            self._show_image_in_manager(self.default_explorer_image_path)
+        else:
+            self.fm_text_area.pack_forget()
+            self.fm_canvas.pack(fill="both", expand=True)
+            self.fm_canvas.delete("all")
+
+    # --- KONIEC SEKCJI DLA ULEPSZONEGO FILE EXPLORERA ---
 
     def populate_file_tree(self, parent_path, parent_node):
         """Rekurencyjnie wypełnia Treeview strukturą plików i katalogów."""
@@ -981,7 +849,7 @@ class OS:
             messagebox.showerror("Błąd", f"Nie można otworzyć pliku: {e}")
 
     def open_selected_item_from_manager(self):
-        """Otwiera zaznaczony element z File Explorera."""
+        """Otwiera zaznaczony element z File Explorera w domyślnej aplikacji."""
         selected_item = self.file_manager_tree.selection()
         if selected_item:
             item_path = self.file_manager_tree.item(selected_item[0], "values")[0]
@@ -1247,7 +1115,7 @@ class OS:
     def run_tornado(self):
         try:
             asyncio.set_event_loop(asyncio.new_event_loop())
-            app = tornado.web.Application([(r"/stock", StockSearchHandler), (r"/websearch", WebSearchHandler)])
+            app = tornado.web.Application([(r"/websearch", WebSearchHandler)])
             app.listen(8889, address="0.0.0.0")
             print("✅ Serwer Tornado działa na http://localhost:8889")
             tornado.ioloop.IOLoop.current().start()
