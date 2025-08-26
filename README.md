@@ -172,4 +172,6 @@ Project is created with:
 
 ![image alt]( https://github.com/PiotrIT2015/OS-WW-P/blob/master/screenshot-7-settings-calculator-2.jpeg?raw=true )
 
+![image alt]( https://github.com/PiotrIT2015/OS-WW-P/blob/master/screenshot-8-file-explorer.jpeg?raw=true )
+
 
