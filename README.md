@@ -164,6 +164,8 @@ Project is created with:
 
 ![image alt](https://github.com/PiotrIT2015/OS-WW-P/blob/master/screenshot-3-pca.jpeg?raw=true)
 
+![image alt]( https://github.com/PiotrIT2015/OS-WW-P/blob/master/screenshot-3-pca-2.jpeg?raw=true )
+
 ![image alt]( https://github.com/PiotrIT2015/OS-WW-P/blob/master/screenshot-4-nmap.jpeg?raw=true )
 
 ![image alt]( https://github.com/PiotrIT2015/OS-WW-P/blob/master/screenshot-5-web-explorer-1.jpeg?raw=true )
