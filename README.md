@@ -1,4 +1,4 @@
-## OS-WW-P
+## OS-WW-P[security]
 
 ## Table of contents
 * [General info](#general-info)
