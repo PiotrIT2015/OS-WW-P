@@ -42,7 +42,7 @@ tools i.e.chatGPT . It is only a shortcut to run a file[*.jar] .
 3. `pip install python-nmap` [po użyciu instalatora(plik nmap-setup.exe) z oficialnej strony]
 4. configure Apache and MySQL on XAMPP/Cloud
 5. double click on `install-require-libraries.bat`
-6. double click on `run.bat`
+6. double click on `wwp-security.bat`
 
 **Other[MS Windows]**
 
@@ -57,7 +57,7 @@ tools i.e.chatGPT . It is only a shortcut to run a file[*.jar] .
 2. `sudo apt install nmap`
 3. configure Apache and MySQL on XAMPP/Cloud
 4. `./install-require-libraries.sh` (via bash)
-5. `./run.sh` (via bash)
+5. `./wwp[security].sh` (via bash)
 
 **Other[Linux]**
 
