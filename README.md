@@ -99,7 +99,7 @@ docker run -d \
 ###3. Uruchom aplikację Python. Pobierz obraz i uruchom kontener:
 
 ```bash
-docker pull piotrit2015/os-ww-p:5.0
+docker pull piotrit2015/wwp-security:1.0
 
 docker run -d \
   --name os-ww-p \

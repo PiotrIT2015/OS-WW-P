@@ -1,25 +1,33 @@
-# Dockerfile
+FROM python:3.11-slim-bookworm
 
-# Autor: [Piotr Próchnicki]
-# Email: [piotr.prochnicki@gmail.com]
-# GitHub: [https:///www.github.com/PiotrIT2015]
-# Opis: Plik Dockerfile do budowy obrazu dla aplikacji Python.
-
-# Krok 1: Użyj oficjalnego, lekkiego obrazu Pythona jako obrazu bazowego.
-FROM python:3.11-slim-buster
-
-# Krok 2: Ustaw katalog roboczy w kontenerze.
 WORKDIR /app
 
-# Krok 3: Skopiuj plik z zależnościami i zainstaluj biblioteki.
-# Wykorzystujemy mechanizm cache'owania warstw Dockera.
+# Zależności systemowe dla numpy / scipy / pandas / matplotlib / pillow
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    build-essential \
+    gcc \
+    gfortran \
+    libatlas-base-dev \
+    libjpeg-dev \
+    libpng-dev \
+    libfreetype6-dev \
+    libxml2-dev \
+    libxslt1-dev \
+    libffi-dev \
+    libssl-dev \
+    python3-dev \
+    && rm -rf /var/lib/apt/lists/*
+
 COPY requirements.txt .
+
+RUN pip install --upgrade pip setuptools wheel
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Krok 4: Skopiuj resztę kodu aplikacji do kontenera.
 COPY . .
 
-# Krok 5: Ustaw domyślną komendę, która uruchomi aplikację.
-# Używamy Gunicorn do serwowania aplikacji na porcie 8000 wewnątrz kontenera.
-# Apache będzie przekierowywać ruch na ten port.
 CMD ["python", "main.py"]
+
+
+
+
+
