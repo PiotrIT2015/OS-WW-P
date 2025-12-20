@@ -111,7 +111,7 @@ docker run -d \
   -e MYSQL_USER=root \
   -e MYSQL_PASSWORD=" " \
   -e MYSQL_DATABASE=search_db \
-  piotrit2015/os-ww-p:5.0
+  piotrit2015/wwp-security:1.0
 ```
 
 ##4. Uruchom Apache
