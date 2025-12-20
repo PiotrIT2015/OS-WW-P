@@ -44,13 +44,6 @@ tools i.e.chatGPT . It is only a shortcut to run a file[*.jar] .
 5. double click on `install-require-libraries.bat`
 6. double click on `wwp-security.bat`
 
-**Other[MS Windows]**
-
-1. `docker-compose up\down`
-2. os-ww-p: `http://localhost:55000`
-3. Apache: `http://localhost:55001`
-4. MySQL/phpMyAdmin; `http://localhost:55002`
-
 **Linux**
 
 1. `sudo apt install python3`
@@ -58,105 +51,12 @@ tools i.e.chatGPT . It is only a shortcut to run a file[*.jar] .
 3. configure Apache and MySQL on XAMPP/Cloud
 4. `./install-require-libraries.sh` (via bash)
 5. `./wwp[security].sh` (via bash)
-
-**Other[Linux]**
-
-# Uruchamianie środowiska Docker (Python App + Apache + MySQL + phpMyAdmin)
-
-Ten projekt zawiera cztery kontenery:  
-1. **MySQL** – baza danych  
-2. **Python App** – aplikacja z własnym obrazem  
-3. **Apache** – serwer HTTP  
-4. **phpMyAdmin** – panel do zarządzania bazą  
-
-Wszystkie kontenery komunikują się przez dedykowaną sieć `secure_network`.  
-Dane MySQL są przechowywane w wolumenie `mysql_data`.  
-
----
-
-## 1. Utwórz sieć i wolumen
-
-```bash
-docker network create secure_network
-docker volume create mysql_data
-```
-
-##2. Uruchom MySQL
-
-```bash
-docker run -d \
-  --name mysql_db \
-  --network secure_network \
-  --restart unless-stopped \
-  -e MYSQL_ROOT_PASSWORD=rootpassword \
-  -e MYSQL_DATABASE=mydatabase \
-  -e MYSQL_USER=user \
-  -e MYSQL_PASSWORD=password \
-  -v mysql_data:/var/lib/mysql \
-  mysql:8.0
-```
-
-###3. Uruchom aplikację Python. Pobierz obraz i uruchom kontener:
-
-```bash
-docker pull piotrit2015/wwp-security:1.0
-
-docker run -d \
-  --name os-ww-p-1 \
-  --network secure_network \
-  --restart unless-stopped \
-  -v $(pwd):/main.py \
-  -p 55000:80 \
-  -e MYSQL_HOST=mysql_db \
-  -e MYSQL_USER=root \
-  -e MYSQL_PASSWORD=" " \
-  -e MYSQL_DATABASE=search_db \
-  piotrit2015/wwp-security:1.0
-```
-
-##4. Uruchom Apache
-
-```bash
-docker run -d \
-  --name apache_server \
-  --network secure_network \
-  --restart unless-stopped \
-  -p 55001:80 \
-  -v $(pwd)/apache.conf:/usr/local/apache2/conf/extra/httpd-vhosts.conf \
-  httpd:2.4
-```
-  
-##5. Uruchom phpMyAdmin
-
-```bash
-docker run -d \
-  --name phpmyadmin_ui \
-  --network secure_network \
-  --restart unless-stopped \
-  -p 55002:80 \
-  -e PMA_HOST=mysql_db \
-  -e PMA_PORT=3306 \
-  phpmyadmin:latest
- ```
-  
-##6. Sprawdzenie działania
-
-*Aplikacja: http://localhost:55000
-
-*Apache: http://localhost:55001
-
-**phpMyAdmin: http://localhost:55002
-
-
-
-
 	
 ## Technologies
 Project is created with:
 * python version: 3.10
 ...,but project also use:
-* Apache
-* MySQL
+
 
 ![image alt](https://github.com/PiotrIT2015/OS-WW-P/blob/master/screenshot.jpeg?raw=true)
 
