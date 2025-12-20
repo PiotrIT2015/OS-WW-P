@@ -102,7 +102,7 @@ docker run -d \
 docker pull piotrit2015/wwp-security:1.0
 
 docker run -d \
-  --name os-ww-p \
+  --name os-ww-p-1 \
   --network secure_network \
   --restart unless-stopped \
   -v $(pwd):/main.py \
